@@ -1,0 +1,2155 @@
+<title>Jezero Content Base</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Martian+Mono:wght@400;600&family=Saira+Stencil+One&display=swap">
+<style>
+  /* ponytail: single deliberate Mars-dusk look, no light theme */
+  :root {
+    --oxide: #2B1715;
+    --panel: rgba(33, 18, 15, .86);
+    --panel-solid: #2A1714;
+    --line: rgba(237, 227, 214, .16);
+    --ceramic: #EDE3D6;
+    --dust: #CDB3A0;
+    --sunset: #86C9DC;
+    --done: #7EE0B5;
+    --f-display: "Saira Stencil One", "Arial Narrow", Impact, sans-serif;
+    --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+    --f-mono: "Martian Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --t-2xs: .5625rem; --t-xs: .6875rem; --t-sm: .8125rem; --t-md: .9375rem; --t-lg: 1.25rem; --t-xl: 1.75rem;
+    --ease: cubic-bezier(.16, 1, .3, 1);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; overflow: hidden; background: var(--oxide); color: var(--ceramic); font: var(--t-md)/1.45 var(--f-body); }
+  button { font: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--sunset); outline-offset: 2px; }
+
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; touch-action: none; }
+  .overlay { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .hud, .crew, .detail, .toasts { z-index: 1; }
+
+  .hub-label { position: absolute; left: 0; top: 0; transform-origin: 0 0; text-align: center; white-space: nowrap; text-shadow: 0 1px 8px rgba(20, 8, 6, .9); }
+  .hub-label b { display: block; font: 400 var(--t-lg)/1 var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
+  .hub-label span { font: 400 var(--t-2xs)/1.6 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
+
+  .tag { position: absolute; left: 0; top: 0; transform-origin: 0 0; width: 10.5rem; padding: .4rem .55rem .5rem; display: grid; gap: .2rem; text-align: left; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; pointer-events: auto; box-shadow: 0 6px 18px rgba(15, 6, 4, .45); }
+  .tag::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 8px; height: 8px; background: var(--panel-solid); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); transform: translateX(-50%) rotate(45deg); }
+  .tag .who { font: 600 var(--t-2xs)/1.3 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--c); }
+  .tag .task { font-size: var(--t-xs); line-height: 1.25; }
+  .tag .meta { display: flex; justify-content: space-between; gap: .5rem; font: 400 var(--t-2xs)/1.3 var(--f-mono); color: var(--dust); font-variant-numeric: tabular-nums; }
+  .tag[aria-current="true"] { border-color: var(--c); box-shadow: 0 0 0 1px var(--c), 0 6px 18px rgba(15, 6, 4, .45); }
+  .tag.is-hidden { visibility: hidden; }
+
+  .bar { height: 4px; border-radius: 2px; background: rgba(237, 227, 214, .12); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--c); transform-origin: 0 50%; transform: scaleX(0); }
+  [data-state="walk"] .bar i { background: repeating-linear-gradient(90deg, var(--dust) 0 4px, transparent 4px 7px); opacity: .75; }
+  [data-state="done"] .bar i { background: var(--done); }
+
+  .hud { position: fixed; top: 1rem; left: 1rem; right: 23rem; display: flex; flex-wrap: wrap; align-items: flex-start; gap: .75rem 1.5rem; pointer-events: none; }
+  .hud > * { pointer-events: auto; }
+  .brand { display: grid; gap: .25rem; text-shadow: 0 1px 10px rgba(20, 8, 6, .85); }
+  .eyebrow { margin: 0; font: 400 var(--t-2xs)/1.4 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dust); }
+  h1 { margin: 0; font: 400 var(--t-xl)/1 var(--f-display); letter-spacing: .04em; text-transform: uppercase; text-wrap: balance; }
+  .clock { margin: 0; display: flex; gap: .9rem; font: 400 var(--t-xs)/1.4 var(--f-mono); font-variant-numeric: tabular-nums; color: var(--sunset); }
+  .console { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: .5rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(8px); }
+  .topic { display: grid; gap: .1rem; padding: 0 .35rem; }
+  .topic span { font: 400 var(--t-2xs)/1.2 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dust); }
+  .topic input { width: 17rem; max-width: 100%; padding: .2rem 0; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ceramic); font: inherit; font-size: var(--t-sm); }
+  .btn { padding: .45rem .6rem; border: 1px solid var(--line); border-radius: 4px; background: rgba(237, 227, 214, .04); font: 400 var(--t-2xs)/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: background .15s, border-color .15s; }
+  .btn:hover { background: rgba(237, 227, 214, .1); }
+  .btn:active { transform: translateY(1px); }
+  .btn[aria-pressed="true"] { border-color: var(--sunset); color: var(--sunset); }
+
+  .crew { position: fixed; top: 1rem; right: 1rem; bottom: 1rem; width: 21rem; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(10px); }
+  .crew > header { padding: .9rem 1rem .7rem; border-bottom: 1px solid var(--line); }
+  .crew > header { position: relative; padding-right: 3.2rem; }
+  .crew > header .panel-close { position: absolute; top: .75rem; right: .75rem; padding: .3rem .45rem; }
+  .crew h2 { margin: 0; font: 400 var(--t-lg)/1 var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
+  .crew header p { margin: .35rem 0 0; font: 400 var(--t-xs)/1.3 var(--f-mono); color: var(--dust); font-variant-numeric: tabular-nums; }
+  .roster { overflow-y: auto; padding: .25rem 0 .75rem; }
+  .group h3 { display: flex; align-items: center; gap: .5rem; margin: 0; padding: .85rem 1rem .35rem; font: 400 var(--t-md)/1 var(--f-display); letter-spacing: .05em; text-transform: uppercase; }
+  .group h3 small { font: 400 var(--t-2xs)/1 var(--f-mono); letter-spacing: .08em; color: var(--dust); }
+  .hx { flex: none; width: .62rem; height: .72rem; background: var(--c); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+  .row { width: 100%; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .15rem .75rem; padding: .45rem 1rem; border: 0; background: transparent; text-align: left; cursor: pointer; }
+  .row:hover { background: rgba(237, 227, 214, .06); }
+  .row[aria-current="true"] { background: rgba(134, 201, 220, .13); }
+  .row .nm { font-size: var(--t-sm); font-weight: 700; }
+  .row .id { grid-column: 1; font: 400 var(--t-2xs)/1.3 var(--f-mono); color: var(--dust); overflow-wrap: anywhere; }
+  .row .st { grid-column: 2; grid-row: 1 / span 2; display: grid; justify-items: end; gap: .3rem; font: 400 var(--t-2xs)/1 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; font-variant-numeric: tabular-nums; color: var(--dust); }
+  .row .st .bar { width: 3.5rem; }
+  .row[data-state="work"] .st { color: var(--sunset); }
+  .row[data-state="done"] .st { color: var(--done); }
+
+  .detail { position: fixed; left: 1rem; bottom: 1rem; width: 22rem; max-height: calc(100% - 10rem); overflow-y: auto; padding: 1rem 1.1rem 1.1rem; display: grid; gap: .55rem; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(10px); }
+  .detail .close { position: absolute; top: .75rem; right: .75rem; }
+  .detail .eyebrow { color: var(--c); }
+  .detail h2 { margin: 0; padding-right: 4rem; font: 400 1.6rem/1 var(--f-display); letter-spacing: .04em; text-transform: uppercase; text-wrap: balance; }
+  .detail .id { margin: 0; font: 400 var(--t-xs)/1.3 var(--f-mono); color: var(--dust); }
+  .detail p { margin: 0; font-size: var(--t-sm); max-width: 65ch; }
+  .detail .status { font: 400 var(--t-xs)/1.5 var(--f-mono); color: var(--sunset); }
+  .detail h3 { margin: .35rem 0 0; font: 600 var(--t-2xs)/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dust); }
+  .cmd { display: flex; align-items: stretch; gap: .4rem; }
+  .cmd code { flex: 1; padding: .5rem .6rem; background: rgba(10, 4, 3, .45); border: 1px solid var(--line); border-radius: 4px; font: 400 var(--t-xs)/1.5 var(--f-mono); overflow-wrap: anywhere; }
+  .detail .setup { font-size: var(--t-xs); color: var(--dust); }
+  .detail .actions { display: flex; gap: .5rem; margin-top: .25rem; }
+
+  .toasts { position: fixed; right: 23rem; bottom: 1rem; width: 19rem; display: flex; flex-direction: column; gap: .45rem; pointer-events: none; }
+  .toast { pointer-events: auto; display: grid; grid-template-columns: auto 1fr; gap: .15rem .6rem; align-items: center; width: 100%; padding: .55rem .7rem; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 6px; text-align: left; cursor: pointer; box-shadow: 0 10px 30px rgba(15, 6, 4, .5); animation: toast-in .5s var(--ease); }
+  .toast .hx { grid-row: span 2; }
+  .toast .t1 { font-size: var(--t-sm); font-weight: 700; }
+  .toast .t1 b { margin-right: .4rem; font: 600 var(--t-2xs)/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sunset); }
+  .toast .t2 { font-size: var(--t-xs); color: var(--dust); }
+  .toast.leaving { opacity: 0; transform: translateY(6px); transition: opacity .3s, transform .3s; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
+
+  .crew-tab { position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 3; writing-mode: vertical-rl; padding: 1rem .45rem; border-radius: 6px 0 0 6px; letter-spacing: .16em; }
+  .notif { position: fixed; right: 1rem; top: 4.7rem; width: 21rem; max-width: calc(100% - 2rem); max-height: 55%; overflow-y: auto; z-index: 4; padding: .85rem .95rem; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(10px); }
+  .notif h2 { margin: 0 0 .2rem; font: 400 var(--t-lg)/1 var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
+  .notif .hint { margin: 0 0 .5rem; font-size: var(--t-xs); color: var(--dust); }
+  .notif ul { margin: 0; padding: 0; }
+  .notif li { list-style: none; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .5rem; padding: .45rem 0; border-top: 1px solid var(--line); font-size: var(--t-xs); }
+  .notif time { font: 400 var(--t-2xs)/1 var(--f-mono); color: var(--dust); font-variant-numeric: tabular-nums; }
+  .notif .empty { margin: 0; font-size: var(--t-xs); color: var(--dust); }
+
+  .weather { position: fixed; top: 5.7rem; right: 23rem; z-index: 2; display: flex; flex-wrap: wrap; gap: .35rem; max-width: calc(100% - 24rem); padding: .4rem; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(8px); }
+  .crew { top: 4.7rem; }
+  @media (max-width: 760px) { .weather { top: auto; bottom: 7rem; right: .5rem; flex-wrap: wrap; justify-content: flex-end; max-width: 70%; } }
+
+  .status-strip { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%); z-index: 2; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .25rem .7rem; width: min(32rem, calc(100% - 2rem)); padding: .7rem .9rem; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(10px); }
+  .status-strip .hx { grid-row: span 2; width: .8rem; height: .92rem; }
+  .status-strip p { margin: 0; font-size: var(--t-sm); }
+  .status-strip .bar { --c: var(--sunset); }
+  .tag[data-state="idle"] { opacity: .5; }
+  .tag[data-state="idle"] .who, .row[data-state="idle"] .st { color: var(--dust); }
+
+  body.crew-closed .hud { right: 1rem; }
+  body.crew-closed .toasts { right: 1rem; }
+  .fallback { position: fixed; inset: 0; display: grid; place-items: center; padding: 2rem; text-align: center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast { animation: none; }
+    .toast.leaving { transition: none; }
+  }
+  @media (max-width: 760px) {
+    .hud { top: .5rem; left: .5rem; right: .5rem; }
+    h1 { font-size: var(--t-lg); }
+    .topic { flex: 1 1 100%; }
+    .topic input { width: 100%; }
+    .crew { top: auto; left: .5rem; right: .5rem; bottom: .5rem; width: auto; max-height: 55%; }
+    .detail { left: .5rem; right: .5rem; bottom: .5rem; width: auto; max-height: 60%; }
+    .toasts, body.crew-closed .toasts { left: .5rem; right: .5rem; bottom: .5rem; width: auto; }
+    .tag { width: 8.5rem; }
+  }
+</style>
+
+<div id="stage" role="img" aria-label="3D Mars base. Drag to orbit, scroll or pinch to zoom, click a bot to see its skill."></div>
+<div class="overlay" id="labels" aria-hidden="true"></div>
+<div class="overlay" id="tags"></div>
+
+<header class="hud">
+  <div class="brand">
+    <p class="eyebrow">Video content habitat · Jezero Crater, Mars</p>
+    <h1>Jezero Content Base</h1>
+    <p class="clock"><span id="msd">MSD —</span><span id="lmst">LMST —</span></p>
+  </div>
+  <div class="console" role="toolbar" aria-label="Base controls">
+    <label class="topic"><span>Now producing (example)</span><input id="topic" value="5 AI tools every Pune shop should use" maxlength="60" autocomplete="off"></label>
+    <button class="btn" id="play" aria-pressed="false">Run pipeline</button>
+    <button class="btn" id="step">Step</button>
+    <button class="btn" id="speed">Speed 1×</button>
+    <button class="btn" id="tagMode">Tags: active</button>
+    <button class="btn" id="notifBtn" aria-expanded="false" aria-controls="notif">Notifications</button>
+    <button class="btn" id="alerts" aria-pressed="false">Desktop alerts</button>
+    <button class="btn" id="crewBtn" aria-expanded="false" aria-controls="crew">Skills</button>
+  </div>
+</header>
+
+<div class="weather" role="toolbar" aria-label="Weather and time of day">
+  <button class="btn" data-weather="clear" aria-pressed="true">Clear</button>
+  <button class="btn" data-weather="night" aria-pressed="false">Night</button>
+  <button class="btn" data-weather="rain" aria-pressed="false">Rain</button>
+  <button class="btn" data-weather="snow" aria-pressed="false">Snow</button>
+  <button class="btn" data-weather="storm" aria-pressed="false">Storm</button>
+  <button class="btn" id="sound" aria-pressed="false">Sound off</button>
+</div>
+
+<aside class="crew" id="crew" aria-labelledby="crewTitle">
+  <header>
+    <h2 id="crewTitle">Skills</h2>
+    <button class="btn panel-close" id="crewClose" aria-label="Close skills panel" title="Close skills panel">×</button>
+    <p><span id="crewCount">0</span> installed · <span id="activeCount">0</span> running now</p>
+    <p class="hint">One bot per skill. Click a row to see what it does and how to start it.</p>
+  </header>
+  <div class="roster" id="roster"></div>
+</aside>
+
+<section class="detail" id="detail" hidden aria-labelledby="dName">
+  <button class="btn close" id="dClose">Close</button>
+  <p class="eyebrow" id="dHub"></p>
+  <h2 id="dName"></h2>
+  <p class="id" id="dId"></p>
+  <p class="status" id="dStatus"></p>
+  <p id="dWhat"></p>
+  <h3>How to activate</h3>
+  <div class="cmd"><code id="dCmd"></code><button class="btn" id="copy">Copy</button></div>
+  <p class="setup" id="dSetup"></p>
+  <div class="actions"><button class="btn" id="follow" aria-pressed="false">Follow bot</button></div>
+</section>
+
+<div class="status-strip" id="statusStrip" role="status" aria-live="polite">
+  <span class="hx" id="ssDot"></span>
+  <p id="ssText">Idle - nothing is running.</p>
+  <span class="bar"><i id="ssFill"></i></span>
+</div>
+
+<button class="btn crew-tab" id="crewTab" aria-controls="crew" aria-expanded="false">Skills</button>
+
+<section class="notif" id="notif" hidden aria-labelledby="notifTitle">
+  <h2 id="notifTitle">Notifications</h2>
+  <p class="hint">Events land here instead of popping up over the scene.</p>
+  <ul id="notifList"></ul>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// Hubs are buildings; each owns one stage of the video pipeline.
+const HUBS = [
+  { id: 'core',     name: 'Ops Core',       role: 'Orchestration',    color: 0xF4EDE4 },
+  { id: 'signal',   name: 'Signal Array',   role: 'Trend spotting',   color: 0x86C9DC },
+  { id: 'archive',  name: 'Archive Dome',   role: 'Content finding',  color: 0xB3D07A },
+  { id: 'script',   name: 'Script Lab',     role: 'Scripting',        color: 0xB9A3E8 },
+  { id: 'headline', name: 'Headline Relay', role: 'Titles & SEO',     color: 0xF1CF63 },
+  { id: 'optics',   name: 'Optics Bay',     role: 'Thumbnails',       color: 0xF291B5 },
+  { id: 'edit',     name: 'Edit Bay',       role: 'Editing & motion', color: 0x7EE0B5 },
+  { id: 'launch',   name: 'Launch Pad',     role: 'Publishing',       color: 0xFF8A6B },
+  { id: 'hiring',   name: 'Recruitment Office', role: 'Skill hiring', color: 0xE0B084 },
+];
+
+// One bot per installed skill. tasks: [label, hubId, seconds]; the bot walks to each hub in turn.
+const BOTS = [
+  { name: 'Trend Spotter', id: 'anthropic-skills:last30days', home: 'signal',
+    what: 'Finds what people are saying about a topic in the last 30 days across Reddit, X, YouTube, TikTok and Hacker News.',
+    cmd: '/anthropic-skills:last30days AI tools for small shops', setup: 'Works without keys; ScrapeCreators, Apify, Exa or Serper keys add more sources.',
+    tasks: [['Scan Reddit, X & YouTube', 'signal', 11], ['Hand rising angles to research', 'archive', 6], ['Score topic demand', 'core', 8]] },
+  { name: 'HN Scout', id: 'hackernews-frontpage', home: 'signal',
+    what: 'Pulls the Hacker News front page with points and comment counts, for tech-audience trend checks.',
+    cmd: '/hackernews-frontpage',
+    tasks: [['Pull HN front page', 'signal', 7], ['Flag tech hooks', 'script', 6], ['Rank by points & comments', 'signal', 8]] },
+  { name: 'Content Finder', id: 'ecc:exa-search', home: 'archive',
+    what: 'Neural web search for sources, examples, companies and people behind a topic.',
+    cmd: '/ecc:exa-search', setup: 'Needs the Exa MCP server and EXA_API_KEY; not configured on this Mac yet.',
+    tasks: [['Find sources on the topic', 'archive', 10], ['Attach 5 references', 'script', 7], ['Look up tools & companies', 'archive', 9]] },
+  { name: 'Deep Researcher', id: 'ecc:deep-research', home: 'archive',
+    what: 'Researches across many web sources and returns a report with citations.',
+    cmd: '/ecc:deep-research', setup: 'Needs the Firecrawl and Exa MCP servers; not configured on this Mac yet.',
+    tasks: [['Write cited research brief', 'archive', 14], ['File brief to Ops Core', 'core', 6], ['Fact-check script claims', 'archive', 10]] },
+  { name: 'Page Scraper', id: 'scrape', home: 'archive',
+    what: 'Pulls structured data from a web page, like pricing tables or feature lists. Read-only.',
+    cmd: '/scrape pricing table from <url>',
+    tasks: [['Extract pricing tables', 'archive', 8], ['Feed stats for titles', 'headline', 6]] },
+  { name: 'Video Watcher', id: 'anthropic-skills:watch', home: 'archive',
+    what: 'Watches a video from a link or file, reads frames and transcript, and answers what works in it.',
+    cmd: '/anthropic-skills:watch <video-url> what hook do they use?', setup: 'yt-dlp and ffmpeg are installed. Videos without captions need OPENAI_API_KEY or GROQ_API_KEY for Whisper.',
+    tasks: [['Watch top competitor video', 'archive', 12], ['Note their hook timing', 'script', 7], ['List their title patterns', 'headline', 7]] },
+  { name: 'Scriptwriter', id: 'ecc:content-engine', home: 'script',
+    what: 'Writes platform-native scripts, posts and content calendars for YouTube, TikTok, X and LinkedIn.',
+    cmd: '/ecc:content-engine',
+    tasks: [['Draft cold open (0:00–0:15)', 'script', 12], ['Outline in 3 acts', 'script', 10], ['Deliver final script', 'edit', 6]] },
+  { name: 'Voice Keeper', id: 'ecc:brand-voice', home: 'script',
+    what: 'Builds a voice profile from your real posts so every script and caption sounds like you.',
+    cmd: '/ecc:brand-voice',
+    tasks: [['Match your voice profile', 'script', 9], ['Tone-check titles', 'headline', 6], ['Tone-check captions', 'launch', 6]] },
+  { name: 'Campaign Planner', id: 'ecc:marketing-campaign', home: 'core',
+    what: 'Plans a launch end to end: audience, angle, short-form video scripts, posts and a content calendar.',
+    cmd: '/ecc:marketing-campaign',
+    tasks: [['Plan 4-week calendar', 'core', 12], ['Cut 3 Shorts scripts', 'script', 9], ['Queue launch posts', 'launch', 7]] },
+  { name: 'Title Smith', id: 'marketing-agent', kind: 'agent', home: 'headline',
+    what: 'Copywriter agent for titles, hooks, descriptions and short-form scripts.',
+    cmd: 'Ask Claude: “Use the marketing-agent to write 10 titles for my next video.”',
+    tasks: [['Write 10 title options', 'headline', 10], ['Pair titles to thumbnails', 'optics', 7], ['Shortlist top 3', 'headline', 6]] },
+  { name: 'SEO Mapper', id: 'ecc:seo', home: 'headline',
+    what: 'Keyword mapping and search optimisation for descriptions, tags, chapters and your channel site.',
+    cmd: '/ecc:seo',
+    tasks: [['Map search keywords', 'headline', 10], ['Write description & tags', 'launch', 8], ['Mark chapters', 'headline', 7]] },
+  { name: 'Thumbnail Designer', id: 'banner-design', home: 'optics',
+    what: 'Designs YouTube and social visuals, with several art directions to pick from.',
+    cmd: '/banner-design YouTube thumbnail, bold typography',
+    tasks: [['Compose 1280×720 thumbnail', 'optics', 12], ['Check legibility at 168 px', 'optics', 7], ['Export thumbnail set', 'launch', 5]] },
+  { name: 'Image Generator', id: 'ecc:fal-ai-media', home: 'optics',
+    what: 'Generates images, video clips and voice with fal.ai models for thumbnails and B-roll.',
+    cmd: '/ecc:fal-ai-media', setup: 'Needs the fal.ai MCP server and FAL_KEY; not configured on this Mac yet.',
+    tasks: [['Generate hero image', 'optics', 11], ['Render B-roll clip', 'edit', 12], ['Upscale background', 'optics', 7]] },
+  { name: 'Variant Tester', id: 'design-shotgun', home: 'optics',
+    what: 'Makes several design variants side by side, collects your pick and iterates on the winner.',
+    cmd: '/design-shotgun',
+    tasks: [['Make 3 thumbnail variants', 'optics', 10], ['Collect your pick', 'core', 6], ['Iterate the winner', 'optics', 8]] },
+  { name: 'Editor', id: 'ecc:video-editing', home: 'edit',
+    what: 'Cuts and structures real footage: rough cuts, captions, audio polish and final export.',
+    cmd: '/ecc:video-editing', setup: 'ffmpeg is installed. AI voiceover needs ELEVENLABS_API_KEY.',
+    tasks: [['Rough cut from footage', 'edit', 14], ['Captions & audio polish', 'edit', 10], ['Master final export', 'launch', 8]] },
+  { name: 'Motion Builder', id: 'ecc:remotion-video-creation', home: 'edit',
+    what: 'Builds animated video in React with Remotion: titles, captions, charts and transitions.',
+    cmd: '/ecc:remotion-video-creation',
+    tasks: [['Animate lower-thirds', 'edit', 11], ['Build intro sequence', 'edit', 9], ['Render chapter cards', 'headline', 8]] },
+  { name: 'Explainer Animator', id: 'ecc:manim-video', home: 'edit',
+    what: 'Animates concepts, graphs and diagrams with Manim for explainer segments.',
+    cmd: '/ecc:manim-video', setup: 'Needs the manim Python package, which isn’t installed yet.',
+    tasks: [['Animate the core concept', 'edit', 13], ['Sync to script beats', 'script', 7]] },
+  { name: 'Footage Indexer', id: 'ecc:videodb', home: 'edit',
+    what: 'Indexes video and audio so you can search moments by phrase and auto-clip highlights.',
+    cmd: '/ecc:videodb', setup: 'Needs the videodb Python package and VIDEO_DB_API_KEY; neither is set up yet.',
+    tasks: [['Index raw footage', 'edit', 12], ['Search moments by phrase', 'archive', 8], ['Auto-clip highlights', 'edit', 9]] },
+  { name: 'Demo Recorder', id: 'ecc:ui-demo', home: 'edit',
+    what: 'Records smooth screen walkthroughs of web apps with Playwright, ready for tutorials.',
+    cmd: '/ecc:ui-demo',
+    tasks: [['Record tool walkthrough', 'edit', 11], ['Trim demo pacing', 'edit', 7]] },
+  { name: 'Publisher', id: 'ecc:social-publisher', home: 'launch',
+    what: 'Schedules and publishes to YouTube, Instagram, TikTok and 10 more platforms.',
+    cmd: '/ecc:social-publisher', setup: 'Needs a SocialClaw account.',
+    tasks: [['Schedule YouTube upload', 'launch', 9], ['Queue Reels & TikTok', 'launch', 9], ['Report delivery status', 'core', 6]] },
+  { name: 'Crossposter', id: 'ecc:crosspost', home: 'launch',
+    what: 'Adapts one video’s message for X, LinkedIn, Threads and Bluesky instead of pasting the same post.',
+    cmd: '/ecc:crosspost',
+    tasks: [['Adapt for X & LinkedIn', 'launch', 9], ['Rewrite hooks per platform', 'headline', 7]] },
+  { name: 'Loop Keeper', id: 'schedule', home: 'core',
+    what: 'Runs a Claude task on a schedule, like a Monday-morning trend scan.',
+    cmd: '/schedule every Monday 9am run last30days on my niche',
+    tasks: [['Book weekly trend scan', 'core', 7], ['Arm Monday 09:00 sweep', 'signal', 6]] },
+  { name: 'Skill Recruiter', id: 'anthropic-skills:find-skills', home: 'hiring',
+    what: 'The HR desk for skills: when no installed skill fits a task, it searches the open skills registry, vets installs and GitHub stars, and offers to install the best match.',
+    cmd: '/anthropic-skills:find-skills youtube thumbnail', setup: 'Uses the Skills CLI through npx (needs Node.js).',
+    tasks: [['Scan crew for skill gaps', 'hiring', 8], ['Search skills.sh registry', 'signal', 9], ['Vet installs & GitHub stars', 'archive', 8], ['Onboard the new hire', 'hiring', 7]] },
+
+  // Claude app (Cowork) plugins and desktop extensions found on this Mac.
+  { name: 'Mention Radar', id: 'nimble/brand-mention-monitor', kind: 'plugin', home: 'signal',
+    what: 'Scans Reddit, X, TikTok and YouTube for mentions of a topic or channel, scored by velocity and sentiment.',
+    cmd: 'In Claude’s Cowork tab, ask: “Monitor mentions of AI tools for small shops this week.”', setup: 'Nimble plugin; needs NIMBLE_API_KEY or the Nimble connector sign-in.',
+    tasks: [['Track mention velocity', 'signal', 10], ['Flag sentiment spikes', 'core', 6]] },
+  { name: 'Apify Scout', id: 'apify-mcp-server', kind: 'extension', home: 'signal',
+    what: 'Runs Apify scrapers on YouTube, TikTok and Instagram for trending videos, competitor channels and comments.',
+    cmd: 'In the Claude app, ask: “Use Apify to pull the top 20 YouTube videos on my topic this month.”', setup: 'Already enabled with a token.',
+    tasks: [['Scrape trending YouTube', 'signal', 11], ['Pull competitor comments', 'archive', 9]] },
+  { name: 'Keyword Intel', id: 'nimble/seo-intel', kind: 'plugin', home: 'headline',
+    what: 'Live keyword research, content gaps and competitor keywords for choosing titles and topics.',
+    cmd: 'In Claude’s Cowork tab, ask: “Find keyword gaps for videos about my topic.”', setup: 'Nimble plugin; needs NIMBLE_API_KEY or the Nimble connector sign-in.',
+    tasks: [['Pull live keyword gaps', 'headline', 10], ['Send gaps to Script Lab', 'script', 6]] },
+  { name: 'Template Thumbnailer', id: 'adobe-for-creativity/adobe-design-from-template', kind: 'plugin', home: 'optics',
+    what: 'Makes YouTube thumbnails and social graphics from Adobe Express templates.',
+    cmd: 'In Claude’s Cowork tab, ask: “Make a YouTube thumbnail from a template with this title.”', setup: 'Adobe for creativity plugin; needs the Adobe connector sign-in.',
+    tasks: [['Fill Express template', 'optics', 10], ['Resize to 1280×720', 'optics', 6]] },
+  { name: 'Quick Cutter', id: 'adobe-for-creativity/adobe-edit-quick-cut', kind: 'plugin', home: 'edit',
+    what: 'Cuts a long video into a highlight reel, then crops versions for Shorts, Reels and TikTok.',
+    cmd: 'In Claude’s Cowork tab, ask: “Cut this video into a 45-second highlight reel for Shorts.”', setup: 'Adobe for creativity plugin; needs the Adobe connector sign-in.',
+    tasks: [['Cut highlight reel', 'edit', 12], ['Export 9:16 variations', 'launch', 8]] },
+  { name: 'Postiz Scheduler', id: 'postiz', kind: 'plugin', home: 'launch',
+    what: 'Schedules posts, uploads media and pulls analytics across 28+ platforms including YouTube, TikTok and Instagram.',
+    cmd: 'In Claude’s Cowork tab, ask: “Schedule this Short on YouTube and TikTok for Friday 7pm.”', setup: 'Postiz plugin; needs the postiz CLI and POSTIZ_API_KEY, neither set up yet.',
+    tasks: [['Upload media to Postiz', 'launch', 9], ['Pull post analytics', 'core', 8]] },
+  { name: 'Performance Analyst', id: 'marketing/performance-report', kind: 'plugin', home: 'core',
+    what: 'Reviews channel results, wins and misses, and recommends what to change next.',
+    cmd: 'In Claude’s Cowork tab, ask: “Write a performance report for last month’s videos.”', setup: 'Marketing plugin; pulls data through the Supermetrics connector once signed in.',
+    tasks: [['Read last month’s numbers', 'core', 10], ['Recommend next topics', 'signal', 7]] },
+];
+</script>
+<script>
+// ---- Scene: sky, terrain, hex habitat floor, hub buildings ----
+if (!window.THREE || !THREE.OrbitControls) {
+  document.body.insertAdjacentHTML('beforeend', '<p class="fallback">The 3D engine didn’t load. Check your connection, then reload the page.</p>');
+  throw new Error('three.js failed to load');
+}
+
+const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SUN_DIR = new THREE.Vector3(-0.78, 0.15, -0.6).normalize();
+const HORIZON = 0xC77A4E;
+const HUB_RING_RADIUS = 23;
+const HEX_SIZE = 1;
+const HEX_RINGS = 17;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('stage').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(HORIZON, 55, 320);
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 1500);
+camera.position.set(31, 33, 31);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.target.set(6, 0.5, 2);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.47;
+controls.minDistance = 7;
+controls.maxDistance = 80;
+
+// Sky: butterscotch horizon, oxide zenith, and the blue glow Mars shows around a setting sun.
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(900, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      sunDir: { value: SUN_DIR },
+      zenith: { value: new THREE.Color(0x2B1715) },
+      horizon: { value: new THREE.Color(HORIZON) },
+      blue: { value: new THREE.Color(0x9FD4E6) },
+    },
+    vertexShader: 'varying vec3 vDir; void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform vec3 sunDir, zenith, horizon, blue; varying vec3 vDir;
+      void main() {
+        vec3 dir = normalize(vDir);
+        vec3 c = mix(horizon, zenith, pow(clamp(dir.y, 0.0, 1.0), 0.5));
+        float s = max(dot(dir, sunDir), 0.0);
+        c = mix(c, blue, pow(s, 14.0) * 0.8);
+        c += blue * pow(s, 400.0);
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+  })
+);
+scene.add(sky);
+
+const glowCanvas = document.createElement('canvas');
+glowCanvas.width = glowCanvas.height = 128;
+const glowCtx = glowCanvas.getContext('2d');
+const glowGrad = glowCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
+glowGrad.addColorStop(0, 'rgba(235, 248, 255, 1)');
+glowGrad.addColorStop(0.2, 'rgba(160, 212, 230, .55)');
+glowGrad.addColorStop(1, 'rgba(160, 212, 230, 0)');
+glowCtx.fillStyle = glowGrad;
+glowCtx.fillRect(0, 0, 128, 128);
+const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(glowCanvas), fog: false, depthWrite: false, blending: THREE.AdditiveBlending }));
+sunGlow.position.copy(SUN_DIR).multiplyScalar(850);
+sunGlow.scale.setScalar(170);
+scene.add(sunGlow);
+
+function addMoon(dir, radius, color, stretch) {
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 12), new THREE.MeshBasicMaterial({ color, fog: false }));
+  moon.scale.set(stretch, 1, 1);
+  moon.position.copy(dir.normalize().multiplyScalar(820));
+  scene.add(moon);
+}
+addMoon(new THREE.Vector3(0.35, 0.42, -0.84), 9, 0xB9A48F, 1.35); // Phobos
+addMoon(new THREE.Vector3(0.8, 0.55, 0.25), 4, 0xD8C7B5, 1.1);    // Deimos
+
+const hemiLight = new THREE.HemisphereLight(0xF2C3A0, 0x4A2419, 0.8);
+scene.add(hemiLight);
+const keyLight = new THREE.DirectionalLight(0xFFE0C4, 0.95);
+keyLight.position.set(-26, 34, -16);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+Object.assign(keyLight.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 120 });
+keyLight.shadow.camera.updateProjectionMatrix();
+keyLight.shadow.bias = -0.0006;
+scene.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0x86C9DC, 0.35);
+rimLight.position.set(28, 12, 22);
+scene.add(rimLight);
+
+const MAT = {
+  ceramic: new THREE.MeshStandardMaterial({ color: 0xE8DED2, roughness: 0.85, flatShading: true }),
+  ceramicTwoSided: new THREE.MeshStandardMaterial({ color: 0xE8DED2, roughness: 0.85, flatShading: true, side: THREE.DoubleSide }),
+  dark: new THREE.MeshStandardMaterial({ color: 0x3B2B27, roughness: 0.55, metalness: 0.35, flatShading: true }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x1F2E36, emissive: 0x86C9DC, emissiveIntensity: 0.45, roughness: 0.25, metalness: 0.5 }),
+};
+const glowMat = (color, intensity = 0.9) => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: intensity, roughness: 0.4 });
+
+function part(geometry, material, x, y, z, parent) {
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+// Each builder draws one hub with its front facing +z (toward Ops Core) and returns its footprint radius.
+const BUILDERS = {
+  core(g, c) {
+    part(new THREE.CylinderGeometry(2.3, 2.5, 0.5, 6), MAT.dark, 0, 0.25, 0, g);
+    part(new THREE.CylinderGeometry(1.8, 2.05, 1.9, 6), MAT.ceramic, 0, 1.45, 0, g);
+    part(new THREE.CylinderGeometry(1.86, 1.86, 0.28, 6), MAT.glass, 0, 1.75, 0, g);
+    part(new THREE.SphereGeometry(1.55, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), MAT.ceramic, 0, 2.4, 0, g);
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      part(new THREE.CylinderGeometry(0.12, 0.16, 1.45, 8), MAT.ceramic, Math.cos(a) * 2.02, 1.2, Math.sin(a) * 2.02, g);
+    }
+    for (const [x, z] of [[-0.72, 1.84], [0.72, 1.84], [-0.72, -1.84], [0.72, -1.84]]) {
+      part(new THREE.BoxGeometry(0.5, 0.7, 0.08), MAT.glass, x, 1.45, z, g);
+    }
+    part(new THREE.CylinderGeometry(0.05, 0.05, 1.3, 6), MAT.dark, 0, 4.5, 0, g);
+    g.userData.pulse = part(new THREE.SphereGeometry(0.16, 10, 8), glowMat(c, 1.4), 0, 5.2, 0, g).material;
+    return 2.6;
+  },
+  signal(g, c) {
+    part(new THREE.BoxGeometry(1.8, 0.5, 1.8), MAT.dark, 0, 0.25, 0, g);
+    part(new THREE.CylinderGeometry(0.16, 0.34, 4.4, 6), MAT.ceramic, 0, 2.7, 0, g);
+    const pivot = new THREE.Group();
+    pivot.position.y = 4.8;
+    g.add(pivot);
+    g.userData.spin = pivot;
+    const dish = new THREE.Group();
+    dish.rotation.x = -0.75;
+    pivot.add(dish);
+    part(new THREE.SphereGeometry(2.7, 24, 9, 0, Math.PI * 2, 0, Math.PI * 0.3), MAT.ceramicTwoSided, 0, 2.35, 0, dish).rotation.x = Math.PI;
+    part(new THREE.CylinderGeometry(0.03, 0.03, 1.2, 5), MAT.dark, 0, 0.75, 0, dish);
+    g.userData.pulse = part(new THREE.SphereGeometry(0.1, 8, 6), glowMat(c, 1.4), 0, 1.4, 0, dish).material;
+    return 2.0;
+  },
+  archive(g, c) {
+    part(new THREE.CylinderGeometry(2.55, 2.65, 0.3, 10), MAT.dark, 0, 0.15, 0, g);
+    part(new THREE.SphereGeometry(2.3, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2), MAT.ceramic, 0, 0.3, 0, g);
+    part(new THREE.CylinderGeometry(0.75, 0.75, 1.5, 8), MAT.ceramic, 0, 0.95, 2.2, g).rotation.x = Math.PI / 2;
+    part(new THREE.CircleGeometry(0.56, 8), MAT.glass, 0, 0.95, 2.96, g);
+    const ring = part(new THREE.TorusGeometry(2.5, 0.06, 6, 48), glowMat(c), 0, 0.34, 0, g);
+    ring.rotation.x = Math.PI / 2;
+    g.userData.pulse = ring.material;
+    return 3.0;
+  },
+  script(g, c) {
+    part(new THREE.CylinderGeometry(1.1, 1.1, 3.8, 12), MAT.ceramic, 0, 1.45, 0, g).rotation.z = Math.PI / 2;
+    for (const x of [-1.9, 1.9]) {
+      part(new THREE.SphereGeometry(1.1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), MAT.ceramic, x, 1.45, 0, g).rotation.z = x > 0 ? -Math.PI / 2 : Math.PI / 2;
+    }
+    for (const x of [-1.2, 0, 1.2]) {
+      part(new THREE.TorusGeometry(1.15, 0.07, 6, 18), MAT.dark, x, 1.45, 0, g).rotation.y = Math.PI / 2;
+    }
+    part(new THREE.BoxGeometry(3.3, 0.26, 0.1), MAT.glass, 0, 1.8, 1.02, g);
+    for (const [x, z] of [[-1.5, 0.7], [1.5, 0.7], [-1.5, -0.7], [1.5, -0.7]]) {
+      part(new THREE.BoxGeometry(0.18, 0.5, 0.18), MAT.dark, x, 0.25, z, g);
+    }
+    g.userData.pulse = part(new THREE.BoxGeometry(0.24, 0.24, 0.24), glowMat(c, 1.3), 0, 2.66, 0, g).material;
+    return 3.3;
+  },
+  headline(g, c) {
+    part(new THREE.CylinderGeometry(1.2, 1.4, 0.5, 8), MAT.dark, 0, 0.25, 0, g);
+    part(new THREE.CylinderGeometry(0.35, 0.7, 4.6, 8), MAT.ceramic, 0, 2.8, 0, g);
+    part(new THREE.ConeGeometry(0.35, 1, 8), MAT.ceramic, 0, 5.6, 0, g);
+    const carousel = new THREE.Group();
+    carousel.position.y = 3.3;
+    g.add(carousel);
+    g.userData.spin = carousel;
+    const ink = glowMat(c, 1.1);
+    for (let i = 0; i < 3; i++) {
+      const a = (i * Math.PI * 2) / 3;
+      const board = part(new THREE.BoxGeometry(1.5, 0.44, 0.06), MAT.dark, Math.sin(a) * 1.05, i * 0.55 - 0.55, Math.cos(a) * 1.05, carousel);
+      board.rotation.y = a;
+      part(new THREE.BoxGeometry(1.1, 0.08, 0.02), ink, 0, 0.07, 0.04, board);
+      part(new THREE.BoxGeometry(0.7, 0.06, 0.02), ink, -0.2, -0.08, 0.04, board);
+    }
+    g.userData.pulse = ink;
+    return 2.0;
+  },
+  optics(g, c) {
+    part(new THREE.BoxGeometry(3, 2, 2.4), MAT.ceramic, 0, 1, 0, g);
+    part(new THREE.BoxGeometry(3.2, 0.2, 2.6), MAT.dark, 0, 2.1, 0, g);
+    part(new THREE.TorusGeometry(0.75, 0.2, 8, 28), MAT.dark, 0, 1.1, 1.22, g);
+    g.userData.pulse = part(new THREE.CircleGeometry(0.6, 28), glowMat(c, 0.9), 0, 1.1, 1.21, g).material;
+    part(new THREE.BoxGeometry(1.2, 0.14, 0.9), MAT.glass, 0.6, 2.27, -0.3, g);
+    return 2.9;
+  },
+  edit(g, c) {
+    const seam = glowMat(c, 1.1);
+    const modules = [[0, 0.55, 0, 3, 1.1, 2.1], [0.3, 1.65, 0.15, 2.4, 1.1, 1.7], [-0.2, 2.75, -0.1, 1.6, 1.1, 1.3]];
+    modules.forEach(([x, y, z, w, h, d], i) => {
+      part(new THREE.BoxGeometry(w, h, d), i % 2 ? MAT.dark : MAT.ceramic, x, y, z, g);
+      part(new THREE.BoxGeometry(w + 0.02, 0.06, d + 0.02), seam, x, y - h / 2 + 0.06, z, g);
+      part(new THREE.BoxGeometry(w * 0.6, 0.22, 0.04), MAT.glass, x, y + 0.1, z + d / 2 + 0.02, g);
+    });
+    part(new THREE.CylinderGeometry(0.03, 0.03, 1, 5), MAT.dark, -0.2, 3.8, -0.1, g);
+    g.userData.pulse = seam;
+    return 2.6;
+  },
+  launch(g, c) {
+    part(new THREE.CylinderGeometry(2.3, 2.4, 0.25, 18), MAT.dark, 0, 0.125, 0, g);
+    const ring = part(new THREE.TorusGeometry(1.9, 0.05, 6, 48), glowMat(c), 0, 0.27, 0, g);
+    ring.rotation.x = Math.PI / 2;
+    const rocket = new THREE.Group();
+    rocket.position.set(-0.2, 0.25, -0.3);
+    g.add(rocket);
+    rocket.scale.setScalar(1.35);
+    part(new THREE.CylinderGeometry(0.46, 0.52, 2.9, 12), MAT.ceramic, 0, 1.7, 0, rocket);
+    part(new THREE.ConeGeometry(0.46, 1.05, 12), glowMat(c, 0.7), 0, 3.7, 0, rocket);
+    for (let i = 0; i < 3; i++) {
+      const a = (i * Math.PI * 2) / 3;
+      part(new THREE.BoxGeometry(0.08, 0.85, 0.62), MAT.dark, Math.sin(a) * 0.55, 0.58, Math.cos(a) * 0.55, rocket).rotation.y = a;
+    }
+    part(new THREE.BoxGeometry(0.3, 3.6, 0.3), MAT.dark, 1.1, 2, -0.3, g);
+    part(new THREE.BoxGeometry(0.9, 0.1, 0.12), MAT.dark, 0.65, 3, -0.3, g);
+    g.userData.pulse = ring.material;
+    return 2.7;
+  },
+  hiring(g, c) {
+    part(new THREE.BoxGeometry(2.8, 1.4, 2), MAT.ceramic, 0, 0.7, 0, g);
+    part(new THREE.CylinderGeometry(1, 1, 2.8, 12, 1, false, 0, Math.PI), MAT.ceramic, 0, 1.4, 0, g).rotation.z = Math.PI / 2;
+    part(new THREE.BoxGeometry(0.8, 1.1, 0.1), glowMat(c, 0.7), 0, 0.6, 1.02, g);
+    part(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 5), MAT.dark, 1.7, 1.1, 0.9, g);
+    const sign = part(new THREE.BoxGeometry(0.9, 0.5, 0.06), MAT.dark, 1.7, 2.0, 0.9, g);
+    g.userData.pulse = part(new THREE.BoxGeometry(0.6, 0.12, 0.02), glowMat(c, 1.2), 0, 0, 0.04, sign).material;
+    return 2.6;
+  },
+};
+
+const HUB_BY_ID = {};
+const HUB_LIFT = { optics: 0.9, edit: 1.7 }; // two buildings stand on raised hex terraces
+HUBS.forEach((hub, i) => {
+  const angle = ((i - 1) / (HUBS.length - 1)) * Math.PI * 2 - Math.PI / 2;
+  hub.index = i;
+  hub.pos = i === 0 ? new THREE.Vector3() : new THREE.Vector3(Math.cos(angle) * HUB_RING_RADIUS, 0, Math.sin(angle) * HUB_RING_RADIUS);
+  hub.group = new THREE.Group();
+  hub.group.position.copy(hub.pos);
+  if (i > 0) hub.group.rotation.y = Math.atan2(-hub.pos.x, -hub.pos.z);
+  hub.radius = BUILDERS[hub.id](hub.group, hub.color);
+  const structureScale = hub.id === 'core' ? 1.1 : 1.18;
+  hub.group.scale.setScalar(structureScale);
+  hub.radius *= structureScale;
+  const lift = HUB_LIFT[hub.id] || 0;
+  if (lift) {
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(hub.radius + 0.7, hub.radius + 1.05, lift, 6), new THREE.MeshStandardMaterial({ color: 0x7A4A32, roughness: 1, flatShading: true }));
+    pedestal.position.set(hub.pos.x, lift / 2, hub.pos.z);
+    pedestal.castShadow = pedestal.receiveShadow = true;
+    scene.add(pedestal);
+    const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.6, lift * 0.9, 2.4), new THREE.MeshStandardMaterial({ color: 0x6A4029, roughness: 1, flatShading: true }));
+    ramp.position.set(hub.pos.x * 0.93, lift * 0.45, hub.pos.z * 0.93);
+    ramp.rotation.y = Math.atan2(-hub.pos.x, -hub.pos.z);
+    ramp.receiveShadow = true;
+    scene.add(ramp);
+    hub.group.position.y = lift;
+  }
+  scene.add(hub.group);
+  hub.top = new THREE.Box3().setFromObject(hub.group).max.y;
+  HUB_BY_ID[hub.id] = hub;
+});
+
+// Hex habitat floor. CylinderGeometry's first vertex points along +z, so this is a pointy-top axial grid.
+const tileGeo = new THREE.CylinderGeometry(HEX_SIZE * 0.94, HEX_SIZE * 0.94, 0.3, 6);
+const PLATE = new THREE.Color(0xD9C8B6), DUST = new THREE.Color(0xA85C3A), PAD = new THREE.Color(0x5A3A30);
+const distToSpoke = (px, pz, hx, hz) => {
+  const t = THREE.MathUtils.clamp((px * hx + pz * hz) / (hx * hx + hz * hz), 0, 1);
+  return Math.hypot(px - hx * t, pz - hz * t);
+};
+const GARDEN_POS = new THREE.Vector3(15.5, 0, 6.4);
+const GARDEN_POS_2 = new THREE.Vector3(-15, 0, -7.5);
+const plates = [], walkways = [];
+for (let q = -HEX_RINGS; q <= HEX_RINGS; q++) {
+  for (let r = Math.max(-HEX_RINGS, -q - HEX_RINGS); r <= Math.min(HEX_RINGS, -q + HEX_RINGS); r++) {
+    const x = HEX_SIZE * Math.sqrt(3) * (q + r / 2), z = HEX_SIZE * 1.5 * r;
+    if (Math.hypot(x - GARDEN_POS.x, z - GARDEN_POS.z) < 4.3 || Math.hypot(x - GARDEN_POS_2.x, z - GARDEN_POS_2.z) < 2.8) continue; // garden basins are cut out of the deck
+    const underHub = HUBS.some(h => Math.hypot(x - h.pos.x, z - h.pos.z) < h.radius + 0.4);
+    const onWalkway = !underHub && HUBS.slice(1).some(h => distToSpoke(x, z, h.pos.x, h.pos.z) < 0.9);
+    (onWalkway ? walkways : plates).push({ x, z, underHub });
+  }
+}
+function tileField(tiles, material) {
+  const mesh = new THREE.InstancedMesh(tileGeo, material, tiles.length);
+  const matrix = new THREE.Matrix4(), color = new THREE.Color();
+  tiles.forEach((t, i) => {
+    const noise = (Math.sin(t.x * 12.9898 + t.z * 78.233) * 43758.5453) % 1;
+    matrix.makeTranslation(t.x, -0.15 + noise * 0.03, t.z);
+    mesh.setMatrixAt(i, matrix);
+    const edge = THREE.MathUtils.clamp(Math.hypot(t.x, t.z) / (HEX_RINGS * 1.6), 0, 1);
+    if (t.underHub) color.copy(PAD);
+    else color.copy(PLATE).lerp(DUST, edge * edge * 0.9 + Math.abs(noise) * 0.12);
+    mesh.setColorAt(i, color);
+  });
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+tileField(plates, new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }));
+tileField(walkways, new THREE.MeshStandardMaterial({ roughness: 0.6, emissive: 0x86C9DC, emissiveIntensity: 0.22, flatShading: true }));
+const grout = new THREE.Mesh(new THREE.CylinderGeometry(30.5, 31, 0.25, 48), new THREE.MeshStandardMaterial({ color: 0x2E1A15, roughness: 1 }));
+grout.position.y = -0.3;
+grout.receiveShadow = true;
+scene.add(grout);
+
+// The deck stands on a shallow plinth and six legs, so it reads as lifted off the crater floor.
+const plinth = new THREE.Mesh(new THREE.CylinderGeometry(29.2, 27, 1.5, 6), new THREE.MeshStandardMaterial({ color: 0x24130F, roughness: 1, flatShading: true }));
+plinth.position.y = -1.15;
+plinth.receiveShadow = true;
+scene.add(plinth);
+for (let i = 0; i < 6; i++) {
+  const a = (i / 6) * Math.PI * 2 + 0.5;
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1, 2.2, 6), MAT.dark);
+  leg.position.set(Math.cos(a) * 21, -1.6, Math.sin(a) * 21);
+  leg.castShadow = leg.receiveShadow = true;
+  scene.add(leg);
+}
+
+// Comms towers: they mark the base from a distance and their beacons blink at night.
+function commsTower(x, z, height, color) {
+  const tower = new THREE.Group();
+  tower.position.set(x, 0, z);
+  part(new THREE.CylinderGeometry(0.16, 0.36, height, 6), MAT.ceramic, 0, height / 2, 0, tower);
+  for (let i = 1; i <= 3; i++) {
+    part(new THREE.TorusGeometry(0.32 + (3 - i) * 0.05, 0.05, 6, 14), MAT.dark, 0, (height / 4) * i, 0, tower).rotation.x = Math.PI / 2;
+  }
+  part(new THREE.BoxGeometry(1.7, 0.12, 0.5), MAT.dark, 0, height * 0.82, 0, tower);
+  part(new THREE.BoxGeometry(0.5, 0.12, 1.7), MAT.dark, 0, height * 0.74, 0, tower);
+  const beacon = part(new THREE.SphereGeometry(0.15, 8, 6), glowMat(color, 1.2), 0, height + 0.22, 0, tower);
+  scene.add(tower);
+  return beacon.material;
+}
+const towerBeacons = [
+  commsTower(-20, -13.5, 9.5, 0xFF8A6B),
+  commsTower(19.5, -16, 7.6, 0x86C9DC),
+  commsTower(-17.5, 17.5, 8.4, 0xF1CF63),
+  commsTower(6, -21, 6.8, 0xB3D07A),
+];
+
+// Jezero crater floor, scattered rocks and the crater rim fading into dust haze.
+const groundGeo = new THREE.PlaneGeometry(1200, 1200, 90, 90);
+groundGeo.rotateX(-Math.PI / 2);
+const groundPos = groundGeo.attributes.position;
+for (let i = 0; i < groundPos.count; i++) {
+  const x = groundPos.getX(i), z = groundPos.getZ(i), d = Math.hypot(x, z);
+  const dune = Math.sin(x * 0.045) * Math.cos(z * 0.038) * 1.6 + Math.sin((x + z) * 0.011) * 3;
+  groundPos.setY(i, -2 + (d > 36 ? dune * Math.min((d - 36) / 40, 1) : 0));
+}
+groundGeo.computeVertexNormals();
+const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ color: 0xA4583A, roughness: 1, flatShading: true }));
+ground.receiveShadow = true;
+scene.add(ground);
+
+const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x7E3F28, roughness: 1, flatShading: true });
+for (let i = 0; i < 60; i++) {
+  const a = i * 2.39996, d = 33 + Math.random() * 45, s = 0.3 + Math.random() * 1.1;
+  const rock = new THREE.Mesh(rockGeo, rockMat);
+  rock.scale.set(s * 1.3, s * 0.7, s);
+  rock.rotation.set(i, i * 1.7, 0);
+  rock.position.set(Math.cos(a) * d, -1.85, Math.sin(a) * d);
+  rock.castShadow = rock.receiveShadow = true;
+  scene.add(rock);
+}
+
+const mesaMat = new THREE.MeshStandardMaterial({ color: 0x8C4A31, roughness: 1, flatShading: true });
+for (let i = 0; i < 22; i++) {
+  const a = i * 2.39996 + 0.4, d = 150 + Math.random() * 120, h = 12 + Math.random() * 26, rTop = 10 + Math.random() * 22;
+  const mesa = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rTop * 1.6, h, 7), mesaMat);
+  mesa.position.set(Math.cos(a) * d, h / 2 - 2.5, Math.sin(a) * d);
+  mesa.rotation.y = i;
+  scene.add(mesa);
+}
+
+const DUST_COUNT = 500;
+const dustPositions = new Float32Array(DUST_COUNT * 3);
+for (let i = 0; i < DUST_COUNT; i++) {
+  dustPositions.set([Math.random() * 90 - 45, Math.random() * 14 + 0.2, Math.random() * 90 - 45], i * 3);
+}
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0xF0CDB0, size: 0.09, transparent: true, opacity: 0.55, depthWrite: false }));
+scene.add(dust);
+
+// ---- Biodome garden: a pond with lily pads and lotus, two trees, under glass ----
+const garden = new THREE.Group();
+garden.position.copy(GARDEN_POS);
+scene.add(garden);
+
+// A real basin: hex walls sunk into the deck, a sandy floor, water you can see through, fish under it.
+const basinWall = new THREE.Mesh(
+  new THREE.CylinderGeometry(4.0, 3.25, 1.9, 6, 1, true),
+  new THREE.MeshStandardMaterial({ color: 0x53372B, roughness: 1, side: THREE.DoubleSide, flatShading: true })
+);
+basinWall.position.y = -0.8;
+garden.add(basinWall);
+
+const basinFloor = new THREE.Mesh(new THREE.CylinderGeometry(3.25, 3.25, 0.12, 6), new THREE.MeshStandardMaterial({ color: 0x9A7A57, roughness: 1, flatShading: true }));
+basinFloor.position.y = -1.85;
+garden.add(basinFloor);
+
+function hexShape(radius) {
+  const shape = new THREE.Shape();
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI / 2 + (i * Math.PI) / 3;
+    const x = Math.cos(a) * radius, y = Math.sin(a) * radius;
+    if (i) shape.lineTo(x, y); else shape.moveTo(x, y);
+  }
+  shape.closePath();
+  return shape;
+}
+const kerbShape = hexShape(4.7);
+kerbShape.holes.push(hexShape(4.0));
+const kerb = new THREE.Mesh(new THREE.ExtrudeGeometry(kerbShape, { depth: 0.34, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: 0x6E4433, roughness: 1, flatShading: true }));
+kerb.rotation.x = -Math.PI / 2;
+kerb.position.y = 0.2;
+kerb.receiveShadow = true;
+garden.add(kerb);
+
+const waterShape = new THREE.Shape();
+for (let i = 0; i < 6; i++) {
+  const a = Math.PI / 6 + i * Math.PI / 3;
+  const r = [3.82, 3.46, 3.74, 3.52, 3.88, 3.58][i];
+  const x = Math.cos(a) * r, z = Math.sin(a) * r;
+  if (i) waterShape.lineTo(x, z); else waterShape.moveTo(x, z);
+}
+waterShape.closePath();
+const pond = new THREE.Mesh(
+  new THREE.ShapeGeometry(waterShape),
+  new THREE.MeshStandardMaterial({ color: 0x55D8E7, emissive: 0x0B5268, emissiveIntensity: 0.22, roughness: 0.02, metalness: 0.04, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })
+);
+pond.rotation.x = -Math.PI / 2;
+pond.position.y = 0.04;
+garden.add(pond);
+const pondDepth = new THREE.Mesh(
+  new THREE.CylinderGeometry(3.65, 3.05, 1.95, 6),
+  new THREE.MeshStandardMaterial({ color: 0x0C506B, roughness: 0.22, metalness: 0.03, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide })
+);
+pondDepth.position.y = -0.95;
+garden.add(pondDepth);
+
+const fishMat = new THREE.MeshBasicMaterial({ color: 0xFFB04F, fog: false });
+const fishEyeMat = new THREE.MeshBasicMaterial({ color: 0x182027, fog: false });
+const fish = [];
+for (let i = 0; i < 6; i++) {
+  const swimmer = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), fishMat);
+  body.scale.set(0.72, 0.46, 1.45);
+  swimmer.add(body);
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.48, 3), fishMat);
+  tail.rotation.x = -Math.PI / 2;
+  tail.position.z = -0.62;
+  swimmer.add(tail);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), fishEyeMat);
+  eye.position.set(0.18, 0.12, 0.5);
+  swimmer.add(eye);
+  swimmer.userData = { velocity: new THREE.Vector3(), target: new THREE.Vector3(), nextTurn: i * 0.7, tail, phase: i * 1.1, depth: -0.24 - (i % 3) * 0.28 };
+  swimmer.position.set((i - 2.5) * 0.6, swimmer.userData.depth, (i % 2) * 0.8 - 0.4);
+  garden.add(swimmer);
+  fish.push(swimmer);
+}
+
+const padMat = new THREE.MeshStandardMaterial({ color: 0x52B061, roughness: 0.65, side: THREE.DoubleSide });
+const petalMat = new THREE.MeshStandardMaterial({ color: 0xF2A8C6, roughness: 0.5 });
+const heartMat = new THREE.MeshStandardMaterial({ color: 0xF3D98B, emissive: 0xF3D98B, emissiveIntensity: 0.25 });
+const lilyPads = [];
+for (let i = 0; i < 8; i++) {
+  const a = i * 2.39996, r = 0.8 + (i % 5) * 0.44;
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(0.42 + (i % 3) * 0.1, 16), padMat);
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.set(Math.cos(a) * r, -0.05, Math.sin(a) * r);
+  garden.add(pad);
+  lilyPads.push(pad);
+  if (i % 3 === 0) {
+    const lotus = new THREE.Group();
+    lotus.position.set(pad.position.x + 0.28, -0.02, pad.position.z + 0.18);
+    for (let p = 0; p < 6; p++) {
+      const pa = (p / 6) * Math.PI * 2;
+      const petal = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.36, 5), petalMat);
+      petal.position.set(Math.cos(pa) * 0.09, 0.17, Math.sin(pa) * 0.09);
+      petal.rotation.set(Math.cos(pa) * 0.55, 0, -Math.sin(pa) * 0.55);
+      petal.castShadow = true;
+      lotus.add(petal);
+    }
+    const heart = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), heartMat);
+    heart.position.y = 0.29;
+    lotus.add(heart);
+    garden.add(lotus);
+  }
+}
+
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6B4A33, roughness: 1, flatShading: true });
+const leafMat = new THREE.MeshStandardMaterial({ color: 0x4E8C52, roughness: 0.9, flatShading: true });
+// Trees stand beside the housing, not the pond.
+const trees = [];
+for (const [tx, tz, s] of [[14.8, -3.4, 1], [-11.6, 11.8, 0.82]]) {
+  const tree = new THREE.Group();
+  tree.position.set(tx, 0, tz);
+  tree.scale.setScalar(s);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.19, 1.7, 7), trunkMat);
+  trunk.position.y = 0.85;
+  trunk.castShadow = true;
+  tree.add(trunk);
+  for (const [ox, oy, r] of [[0, 2, 0.85], [0.32, 2.45, 0.6], [-0.28, 2.35, 0.52]]) {
+    const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), leafMat);
+    leaves.position.set(ox, oy, 0);
+    leaves.castShadow = true;
+    tree.add(leaves);
+  }
+  scene.add(tree);
+  trees.push(tree);
+}
+
+// Three additional silhouettes give the habitat a more varied, lived-in skyline.
+for (const [tx, tz, s, variant] of [[-16, 14, 1.15, 0], [12, -15, 0.95, 1], [2, 18, 1.25, 2]]) {
+  const tree = new THREE.Group();
+  tree.position.set(tx, 0, tz);
+  tree.scale.setScalar(s);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.26, 3.3, 8), trunkMat);
+  trunk.position.y = 1.65;
+  trunk.castShadow = true;
+  tree.add(trunk);
+  if (variant === 0) {
+    for (const [ox, oy, r] of [[0, 3.5, 1.05], [-0.5, 4.15, 0.72], [0.45, 4.35, 0.68]]) {
+      const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leafMat);
+      leaves.position.set(ox, oy, 0);
+      leaves.castShadow = true;
+      tree.add(leaves);
+    }
+  } else if (variant === 1) {
+    for (const [oy, r] of [[3, 1.15], [3.8, 0.9], [4.5, 0.56]]) {
+      const leaves = new THREE.Mesh(new THREE.ConeGeometry(r, 1.35, 8), leafMat);
+      leaves.position.y = oy;
+      leaves.castShadow = true;
+      tree.add(leaves);
+    }
+  } else {
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(1.35, 10, 7), leafMat);
+    crown.scale.set(1, 1.65, 1);
+    crown.position.y = 4.1;
+    crown.castShadow = true;
+    tree.add(crown);
+  }
+  scene.add(tree);
+  trees.push(tree);
+}
+
+const domeGlass = new THREE.Mesh(
+  new THREE.SphereGeometry(4.8, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2),
+  new THREE.MeshStandardMaterial({ color: 0xBFE3EA, transparent: true, opacity: 0.12, roughness: 0.1, metalness: 0.2, side: THREE.DoubleSide })
+);
+garden.add(domeGlass);
+const domeRing = new THREE.Mesh(new THREE.TorusGeometry(4.8, 0.1, 6, 48), new THREE.MeshStandardMaterial({ color: 0xE8DED2, roughness: 0.8 }));
+domeRing.rotation.x = -Math.PI / 2;
+domeRing.position.y = 0.06;
+garden.add(domeRing);
+
+// A second, smaller hex garden: a shallow fountain gives the base another living landmark.
+const fountainGarden = new THREE.Group();
+fountainGarden.position.copy(GARDEN_POS_2);
+scene.add(fountainGarden);
+const fountainKerbShape = hexShape(3.05);
+fountainKerbShape.holes.push(hexShape(2.35));
+const fountainKerb = new THREE.Mesh(new THREE.ExtrudeGeometry(fountainKerbShape, { depth: 0.28, bevelEnabled: false }), new THREE.MeshStandardMaterial({ color: 0x6E4433, roughness: 1, flatShading: true }));
+fountainKerb.rotation.x = -Math.PI / 2;
+fountainKerb.position.y = 0.18;
+fountainGarden.add(fountainKerb);
+const fountainWater = new THREE.Mesh(new THREE.CylinderGeometry(2.32, 2.22, 0.12, 6), new THREE.MeshStandardMaterial({ color: 0x198FA8, roughness: 0.04, metalness: 0.2, transparent: true, opacity: 0.78 }));
+fountainWater.position.y = -0.03;
+fountainGarden.add(fountainWater);
+const fountainStem = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 1.9, 8), MAT.dark);
+fountainStem.position.y = 0.86;
+fountainGarden.add(fountainStem);
+const fountainBowl = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.12, 8, 20), new THREE.MeshStandardMaterial({ color: 0xE8DED2, roughness: 0.7 }));
+fountainBowl.rotation.x = Math.PI / 2;
+fountainBowl.position.y = 1.8;
+fountainGarden.add(fountainBowl);
+const fountainDrops = [];
+for (let i = 0; i < 12; i++) {
+  const drop = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 5), new THREE.MeshStandardMaterial({ color: 0x9FE4EE, emissive: 0x2FA3BC, emissiveIntensity: 0.4, transparent: true, opacity: 0.85 }));
+  drop.userData.phase = i / 12;
+  fountainGarden.add(drop);
+  fountainDrops.push(drop);
+}
+const fountainPads = [];
+for (let i = 0; i < 5; i++) {
+  const a = i * 1.25 + 0.4;
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(0.34 + (i % 2) * 0.08, 12), padMat);
+  pad.rotation.x = -Math.PI / 2;
+  pad.position.set(Math.cos(a) * (0.8 + i * 0.18), 0.04, Math.sin(a) * (0.8 + i * 0.18));
+  fountainGarden.add(pad);
+  fountainPads.push(pad);
+  if (i % 2 === 0) {
+    const bloom = new THREE.Group();
+    bloom.position.set(pad.position.x + 0.06, 0.08, pad.position.z - 0.04);
+    for (let p = 0; p < 5; p++) {
+      const petal = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.23, 5), petalMat);
+      const pa = p * Math.PI * 2 / 5;
+      petal.position.set(Math.cos(pa) * 0.07, 0.12, Math.sin(pa) * 0.07);
+      petal.rotation.set(Math.cos(pa) * 0.5, 0, -Math.sin(pa) * 0.5);
+      bloom.add(petal);
+    }
+    fountainGarden.add(bloom);
+  }
+}
+const frogMat = new THREE.MeshStandardMaterial({ color: 0x6BA85D, roughness: 0.8, flatShading: true });
+const frogEyeMat = new THREE.MeshStandardMaterial({ color: 0xEDE3D6, roughness: 0.35 });
+const frogs = [];
+for (const [x, z, s] of [[-2.7, 1.8, 1], [2.65, -1.35, 0.82], [1.9, 2.25, 0.7]]) {
+  const frog = new THREE.Group();
+  frog.position.set(x, 0.28, z);
+  frog.scale.setScalar(s);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 7), frogMat);
+  body.scale.set(1.25, 0.7, 1);
+  frog.add(body);
+  for (const ex of [-0.13, 0.13]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), frogEyeMat);
+    eye.position.set(ex, 0.22, 0.12);
+    frog.add(eye);
+  }
+  frog.userData = {
+    from: new THREE.Vector3(x, 0.28, z),
+    to: new THREE.Vector3(x * 0.45 - z * 0.18, 0.28, z * 0.45 + x * 0.18),
+    phase: Math.random(),
+    nextJump: 1.5 + Math.random() * 6,
+    jumping: false,
+    jumpStart: 0,
+    jumpDuration: 0.5,
+    jumpHeight: 0.65,
+  };
+  fountainGarden.add(frog);
+  frogs.push(frog);
+}
+
+// ---- Weather and time of day ----
+function particleField(count, spread, height, size, color, opacity) {
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions.set([(Math.random() - 0.5) * spread, Math.random() * height, (Math.random() - 0.5) * spread], i * 3);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const points = new THREE.Points(geometry, new THREE.PointsMaterial({ color, size, transparent: true, opacity, depthWrite: false }));
+  points.visible = false;
+  scene.add(points);
+  return points;
+}
+const snow = particleField(950, 120, 34, 0.3, 0xF4F8FA, 0.92);
+
+// Diagonal rain, drawn as streaks rather than dots: it falls right to bottom-left.
+const RAIN_COUNT = 1300, RAIN_SPREAD = 120, RAIN_TOP = 34;
+const RAIN_DIR = new THREE.Vector3(-0.45, -1, 0.12).normalize();
+const rainPositions = new Float32Array(RAIN_COUNT * 6);
+const rainSpeeds = new Float32Array(RAIN_COUNT);
+function seedDrop(i, y) {
+  const x = (Math.random() - 0.5) * RAIN_SPREAD, z = (Math.random() - 0.5) * RAIN_SPREAD;
+  const length = 1.5 + Math.random() * 1.5;
+  rainSpeeds[i] = 0.75 + Math.random() * 0.5;
+  rainPositions.set([x, y, z, x + RAIN_DIR.x * length, y + RAIN_DIR.y * length, z + RAIN_DIR.z * length], i * 6);
+}
+for (let i = 0; i < RAIN_COUNT; i++) seedDrop(i, Math.random() * RAIN_TOP);
+const rainGeo = new THREE.BufferGeometry();
+rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xAFD2E0, transparent: true, opacity: 0.45 }));
+rain.visible = false;
+scene.add(rain);
+
+function fallRain(dt, elapsed) {
+  if (!rain.visible) return;
+  const p = rainPositions;
+  for (let i = 0; i < RAIN_COUNT; i++) {
+    const o = i * 6;
+    const step = 30 * rainSpeeds[i] * dt;
+    const gust = Math.sin(elapsed * 0.9 + i * 0.37) * 0.018;
+    for (const k of [0, 3]) {
+      p[o + k] += RAIN_DIR.x * step + gust;
+      p[o + k + 1] += RAIN_DIR.y * step;
+      p[o + k + 2] += RAIN_DIR.z * step + gust * 0.35;
+    }
+    if (p[o + 4] < -2) seedDrop(i, RAIN_TOP);
+  }
+  rain.geometry.attributes.position.needsUpdate = true;
+}
+
+// Snow that settles on the deck itself: one thin cap per hex tile, so it matches the deck's exact cutout.
+const snowLayer = (() => {
+  const tiles = plates.concat(walkways);
+  const mesh = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(HEX_SIZE * 0.95, HEX_SIZE * 0.95, 0.1, 6),
+    new THREE.MeshStandardMaterial({ color: 0xF2F6F8, roughness: 0.95, transparent: true, opacity: 0 }),
+    tiles.length
+  );
+  const matrix = new THREE.Matrix4();
+  tiles.forEach((tile, i) => {
+    matrix.makeTranslation(tile.x, 0.02, tile.z);
+    mesh.setMatrixAt(i, matrix);
+  });
+  mesh.receiveShadow = true;
+  mesh.visible = false;
+  scene.add(mesh);
+  return mesh;
+})();
+let snowCover = 0;
+
+// Storm clouds and a bolt you can actually see.
+const clouds = new THREE.Group();
+clouds.visible = false;
+scene.add(clouds);
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0x5C5665, roughness: 1, flatShading: true });
+for (let i = 0; i < 26; i++) {
+  const a = Math.random() * Math.PI * 2, r = Math.random() * 30;
+  const bank = new THREE.Group();
+  bank.position.set(Math.cos(a) * r, 16.5 + Math.random() * 3.5, Math.sin(a) * r);
+  for (let p = 0; p < 3; p++) {
+    const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(3 + Math.random() * 3.5, 1), cloudMat);
+    puff.position.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 6);
+    puff.scale.set(1.5 + Math.random() * 0.6, 0.42, 1.5 + Math.random() * 0.6);
+    bank.add(puff);
+  }
+  clouds.add(bank);
+}
+
+const boltGroup = new THREE.Group();
+boltGroup.visible = false;
+scene.add(boltGroup);
+const boltMat = new THREE.LineBasicMaterial({ color: 0xEAF4FF, transparent: true, opacity: 0.95, fog: false });
+const boltSegmentMat = new THREE.MeshBasicMaterial({ color: 0xF7FDFF, fog: false });
+const impactMat = new THREE.MeshBasicMaterial({ color: 0xBDEFFF, transparent: true, opacity: 0.95, fog: false });
+const boltSegments = [];
+let impactGlow = null;
+let impactRing = null;
+for (const offset of [[0, 0], [0.18, 0.12], [-0.15, -0.1]]) {
+  const line = new THREE.Line(new THREE.BufferGeometry(), boltMat);
+  line.position.set(offset[0], 0, offset[1]);
+  boltGroup.add(line);
+}
+
+function strikeBolt() {
+  const targetHub = HUBS[1 + Math.floor(Math.random() * (HUBS.length - 1))];
+  const target = targetHub.group.position.clone();
+  target.y = Math.max(1.2, targetHub.top * 0.65);
+  const points = [];
+  let x = target.x + (Math.random() - 0.5) * 5, z = target.z + (Math.random() - 0.5) * 5, y = 31;
+  while (y > target.y + 1.3) {
+    points.push(new THREE.Vector3(x, y, z));
+    y -= 1.5 + Math.random() * 2.2;
+    x += (target.x - x) * 0.2 + (Math.random() - 0.5) * 2.2;
+    z += (target.z - z) * 0.2 + (Math.random() - 0.5) * 2.2;
+  }
+  points.push(new THREE.Vector3(target.x, target.y, target.z));
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  for (const line of boltGroup.children) {
+    if (!(line instanceof THREE.Line)) continue;
+    line.geometry.dispose();
+    line.geometry = geometry;
+    line.visible = false;
+  }
+  for (const segment of boltSegments) {
+    boltGroup.remove(segment);
+    segment.geometry.dispose();
+  }
+  boltSegments.length = 0;
+  for (let i = 1; i < points.length; i++) {
+    const from = points[i - 1], to = points[i];
+    const direction = to.clone().sub(from);
+    const segment = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.1, direction.length(), 6), boltSegmentMat);
+    segment.position.copy(from).add(to).multiplyScalar(0.5);
+    segment.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    boltGroup.add(segment);
+    boltSegments.push(segment);
+  }
+  if (impactGlow) boltGroup.remove(impactGlow);
+  impactGlow = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), impactMat);
+  impactGlow.position.copy(target);
+  boltGroup.add(impactGlow);
+  if (impactRing) boltGroup.remove(impactRing);
+  impactRing = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.075, 8, 32), impactMat);
+  impactRing.rotation.x = Math.PI / 2;
+  impactRing.position.set(target.x, 0.06, target.z);
+  boltGroup.add(impactRing);
+  boltGroup.visible = true;
+}
+
+const starPositions = new Float32Array(700 * 3);
+for (let i = 0; i < 700; i++) {
+  const theta = Math.random() * Math.PI * 2, y = Math.random() * 0.8 + 0.08, radial = Math.sqrt(1 - y * y);
+  starPositions.set([Math.cos(theta) * radial * 700, y * 700, Math.sin(theta) * radial * 700], i * 3);
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xE8F0FF, size: 2.6, sizeAttenuation: false, transparent: true, opacity: 0.9, fog: false, depthWrite: false }));
+stars.visible = false;
+scene.add(stars);
+
+// Night fireflies: small warm bioluminescent insects drifting through the habitat.
+const fireflyCanvas = document.createElement('canvas');
+fireflyCanvas.width = fireflyCanvas.height = 64;
+const fireflyCtx = fireflyCanvas.getContext('2d');
+const fireflyGlow = fireflyCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+fireflyGlow.addColorStop(0, 'rgba(255, 249, 177, 1)');
+fireflyGlow.addColorStop(0.18, 'rgba(255, 218, 94, .9)');
+fireflyGlow.addColorStop(0.55, 'rgba(255, 174, 54, .28)');
+fireflyGlow.addColorStop(1, 'rgba(255, 130, 20, 0)');
+fireflyCtx.fillStyle = fireflyGlow;
+fireflyCtx.fillRect(0, 0, 64, 64);
+const fireflyTexture = new THREE.CanvasTexture(fireflyCanvas);
+const fireflyGroup = new THREE.Group();
+fireflyGroup.visible = false;
+scene.add(fireflyGroup);
+const fireflies = [];
+for (let i = 0; i < 54; i++) {
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireflyTexture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.8 }));
+  const radius = 7 + Math.random() * 25;
+  const angle = Math.random() * Math.PI * 2;
+  sprite.position.set(Math.cos(angle) * radius, 0.7 + Math.random() * 5.5, Math.sin(angle) * radius);
+  const base = 0.18 + Math.random() * 0.16;
+  sprite.scale.setScalar(base);
+  sprite.userData = { base, phase: Math.random() * Math.PI * 2, speed: 0.08 + Math.random() * 0.18, drift: 0.15 + Math.random() * 0.4 };
+  fireflyGroup.add(sprite);
+  fireflies.push(sprite);
+}
+
+const WEATHER = {
+  clear: { zenith: 0x2B1715, horizon: 0xC77A4E, fog: 0xC77A4E, key: 0.95, hemi: 0.8, rim: 0.35, rain: false, snow: false, stars: false },
+  night: { zenith: 0x080A16, horizon: 0x2A2038, fog: 0x241C30, key: 0.22, hemi: 0.3, rim: 0.55, rain: false, snow: false, stars: true },
+  rain: { zenith: 0x2A2422, horizon: 0x7A6357, fog: 0x6E5A50, key: 0.45, hemi: 0.55, rim: 0.25, rain: true, snow: false, stars: false },
+  snow: { zenith: 0x3A3440, horizon: 0xB3A8AA, fog: 0xA79C9E, key: 0.6, hemi: 0.72, rim: 0.2, rain: false, snow: true, stars: false },
+  storm: { zenith: 0x121019, horizon: 0x3D3440, fog: 0x332B38, key: 0.2, hemi: 0.32, rim: 0.2, rain: true, snow: false, stars: false },
+};
+let weatherMode = 'clear', lightning = 0, nextStrike = 4;
+
+function setWeather(mode) {
+  const w = WEATHER[mode] || WEATHER.clear;
+  weatherMode = WEATHER[mode] ? mode : 'clear';
+  sky.material.uniforms.zenith.value.setHex(w.zenith);
+  sky.material.uniforms.horizon.value.setHex(w.horizon);
+  scene.fog.color.setHex(w.fog);
+  keyLight.intensity = w.key;
+  hemiLight.intensity = w.hemi;
+  rimLight.intensity = w.rim;
+  rain.visible = w.rain;
+  snow.visible = w.snow;
+  stars.visible = w.stars;
+  fireflyGroup.visible = weatherMode === 'night';
+  clouds.visible = weatherMode === 'storm';
+  if (weatherMode !== 'storm') boltGroup.visible = false;
+  sunGlow.visible = weatherMode === 'clear';
+  dust.visible = weatherMode === 'clear';
+  for (const button of document.querySelectorAll('.weather .btn')) {
+    button.setAttribute('aria-pressed', String(button.dataset.weather === weatherMode));
+  }
+}
+for (const button of document.querySelectorAll('.weather .btn[data-weather]')) {
+  button.addEventListener('click', () => {
+    setWeather(button.dataset.weather);
+    updateAudio(weatherMode);
+  });
+}
+
+// ---- Ambience: every sound is generated in the browser, so there are no audio files to download ----
+let audio = null;
+
+function startAudio() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  const ctx = new Ctx();
+  const master = ctx.createGain();
+  master.gain.value = 0.5;
+  master.connect(ctx.destination);
+  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const layer = (type, frequency, gain) => {
+    const source = ctx.createBufferSource();
+    source.buffer = noiseBuffer;
+    source.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = frequency;
+    const level = ctx.createGain();
+    level.gain.value = gain;
+    source.connect(filter);
+    filter.connect(level);
+    level.connect(master);
+    source.start();
+    return level.gain;
+  };
+  const hum = ctx.createOscillator();
+  hum.type = 'sine';
+  hum.frequency.value = 56;
+  const humLevel = ctx.createGain();
+  humLevel.gain.value = 0;
+  hum.connect(humLevel);
+  humLevel.connect(master);
+  hum.start();
+  audio = { ctx, master, noiseBuffer, wind: layer('lowpass', 420, 0.12), rain: layer('highpass', 950, 0), snow: layer('bandpass', 1450, 0), frogs: layer('bandpass', 380, 0), crickets: layer('bandpass', 4300, 0), hum: humLevel.gain };
+  updateAudio(weatherMode);
+}
+
+// wind, rain, hum levels per weather
+const AUDIO_MIX = { clear: [0.12, 0, 0, 0, 0, 0], night: [0.05, 0, 0, 0.06, 0.012, 0.012], rain: [0.07, 0.035, 0, 0, 0, 0], snow: [0.11, 0.008, 0.045, 0.03, 0, 0], storm: [0.07, 0.2, 0, 0.05, 0, 0] };
+
+function updateAudio(mode) {
+  if (!audio) return;
+  const mix = AUDIO_MIX[mode] || AUDIO_MIX.clear;
+  const now = audio.ctx.currentTime;
+  audio.wind.setTargetAtTime(mix[0], now, 0.8);
+  audio.rain.setTargetAtTime(mix[1], now, 0.8);
+  audio.snow.setTargetAtTime(mix[2], now, 0.8);
+  audio.frogs.setTargetAtTime(mix[4], now, 0.8);
+  audio.crickets.setTargetAtTime(mix[5], now, 0.8);
+  audio.hum.setTargetAtTime(mix[3], now, 0.8);
+}
+
+function thunderSound() {
+  if (!audio) return;
+  const { ctx, master, noiseBuffer } = audio;
+  const source = ctx.createBufferSource();
+  source.buffer = noiseBuffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 240;
+  const level = ctx.createGain();
+  const now = ctx.currentTime;
+  level.gain.setValueAtTime(0.0001, now);
+  level.gain.exponentialRampToValueAtTime(0.72, now + 0.09);
+  level.gain.exponentialRampToValueAtTime(0.0001, now + 2.6);
+  source.connect(filter);
+  filter.connect(level);
+  level.connect(master);
+  source.start(now);
+  source.stop(now + 2.8);
+}
+
+function blip(frequency) {
+  if (!audio) return;
+  const { ctx, master } = audio;
+  const osc = ctx.createOscillator();
+  const level = ctx.createGain();
+  const now = ctx.currentTime;
+  osc.type = 'triangle';
+  osc.frequency.value = frequency;
+  level.gain.setValueAtTime(0.0001, now);
+  level.gain.exponentialRampToValueAtTime(0.1, now + 0.02);
+  level.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+  osc.connect(level);
+  level.connect(master);
+  osc.start(now);
+  osc.stop(now + 0.35);
+}
+
+document.getElementById('sound').addEventListener('click', () => {
+  const button = document.getElementById('sound');
+  if (!audio) {
+    startAudio();
+    button.textContent = audio ? 'Sound on' : 'No audio';
+    button.setAttribute('aria-pressed', String(Boolean(audio)));
+    return;
+  }
+  const turningOn = audio.master.gain.value < 0.01;
+  audio.master.gain.setTargetAtTime(turningOn ? 0.5 : 0, audio.ctx.currentTime, 0.2);
+  button.textContent = turningOn ? 'Sound on' : 'Sound off';
+  button.setAttribute('aria-pressed', String(turningOn));
+});
+
+function fall(points, speed, drift, dt, elapsed) {
+  if (!points.visible) return;
+  const position = points.geometry.attributes.position;
+  for (let i = 0; i < position.count; i++) {
+    let y = position.getY(i) - speed * dt;
+    if (y < 0) y += 34;
+    position.setY(i, y);
+    if (drift) position.setX(i, position.getX(i) + Math.sin(elapsed * 0.8 + i) * drift * dt);
+  }
+  position.needsUpdate = true;
+}
+
+function animateScene(elapsed, dt) {
+  if (REDUCED_MOTION) return;
+  for (const hub of HUBS) {
+    if (hub.group.userData.spin) hub.group.userData.spin.rotation.y += dt * 0.12;
+    if (hub.group.userData.pulse) hub.group.userData.pulse.emissiveIntensity = 0.8 + Math.sin(elapsed * 0.9 + hub.index) * 0.25;
+  }
+  dust.rotation.y += dt * 0.005;
+  for (let i = 0; i < towerBeacons.length; i++) {
+    towerBeacons[i].emissiveIntensity = 0.5 + Math.abs(Math.sin(elapsed * (0.7 + i * 0.15))) * 1.5;
+  }
+  for (let i = 0; i < lilyPads.length; i++) {
+    lilyPads[i].position.y = 0.07 + Math.sin(elapsed * 0.6 + i) * 0.012;
+  }
+  for (const drop of fountainDrops) {
+    const t = (elapsed * 1.45 + drop.userData.phase) % 1;
+    const angle = drop.userData.phase * Math.PI * 12;
+    drop.position.set(Math.cos(angle) * (0.08 + t * 0.82), 1.92 - t * 1.78, Math.sin(angle) * (0.08 + t * 0.82));
+  }
+  for (let i = 0; i < fountainPads.length; i++) {
+    fountainPads[i].position.y = 0.04 + Math.sin(elapsed * 0.9 + i) * 0.015;
+  }
+  for (const frog of frogs) {
+    const f = frog.userData;
+    if (!f.jumping && elapsed >= f.nextJump) {
+      f.from.copy(frog.position);
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 0.7 + Math.random() * 1.5;
+      f.to.set(Math.cos(angle) * radius, 0.28, Math.sin(angle) * radius);
+      f.jumpStart = elapsed;
+      f.jumpDuration = 0.42 + Math.random() * 0.3;
+      f.jumpHeight = 0.55 + Math.random() * 0.25;
+      f.jumping = true;
+    }
+    if (f.jumping) {
+      const t = Math.min(1, (elapsed - f.jumpStart) / f.jumpDuration);
+      const eased = t * t * (3 - 2 * t);
+      frog.position.copy(f.from).lerp(f.to, eased);
+      frog.position.y += Math.sin(t * Math.PI) * f.jumpHeight;
+      frog.rotation.y = Math.atan2(f.to.x - f.from.x, f.to.z - f.from.z);
+      frog.rotation.z = Math.sin(t * Math.PI) * 0.14;
+      if (t >= 1) {
+        f.jumping = false;
+        f.nextJump = elapsed + 2.5 + Math.random() * 7;
+        frog.rotation.z = 0;
+      }
+    }
+  }
+  fallRain(dt, elapsed);
+  fall(snow, 1.5, 0.5, dt, elapsed);
+
+  const coverTarget = weatherMode === 'snow' ? 0.92 : 0;
+  if (Math.abs(coverTarget - snowCover) > 0.002) {
+    snowCover += (coverTarget - snowCover) * Math.min(1, dt * 0.22);
+    snowLayer.material.opacity = snowCover;
+    snowLayer.visible = snowCover > 0.01;
+  }
+  for (const swimmer of fish) {
+    const f = swimmer.userData;
+    if (elapsed >= f.nextTurn) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 0.55 + Math.random() * 2.35;
+      f.target.set(Math.cos(angle) * radius, f.depth + (Math.random() - 0.5) * 0.16, Math.sin(angle) * radius);
+      f.nextTurn = elapsed + 1.8 + Math.random() * 3.8;
+    }
+    const desired = f.target.clone().sub(swimmer.position);
+    if (desired.lengthSq() > 0.001) {
+      desired.normalize().multiplyScalar(0.55 * dt);
+      f.velocity.lerp(desired, Math.min(1, dt * 1.7));
+      swimmer.position.add(f.velocity);
+      swimmer.rotation.y = Math.atan2(f.velocity.x, f.velocity.z);
+      f.tail.rotation.z = Math.sin(elapsed * 14 + f.phase) * 0.32;
+    }
+    swimmer.position.y += Math.sin(elapsed * 1.8 + f.phase) * 0.008;
+  }
+  if (clouds.visible) clouds.rotation.y += dt * 0.006;
+  fireflyGroup.visible = weatherMode === 'night';
+  if (fireflyGroup.visible) {
+    for (const insect of fireflies) {
+      const f = insect.userData;
+      const t = elapsed * f.speed + f.phase;
+      insect.position.x += Math.sin(t * 1.7) * f.drift * dt;
+      insect.position.z += Math.cos(t * 1.35) * f.drift * dt;
+      insect.position.y += Math.sin(t * 1.1) * f.drift * 0.22 * dt;
+      insect.scale.setScalar(f.base * (0.72 + Math.max(0, Math.sin(t * 2.4)) * 0.7));
+      insect.material.opacity = 0.48 + Math.max(0, Math.sin(t * 2.4)) * 0.46;
+    }
+  }
+
+  if (weatherMode === 'storm') {
+    nextStrike -= dt;
+    if (nextStrike <= 0) {
+      lightning = 0.9;
+      nextStrike = 2.5 + Math.random() * 4.5;
+      strikeBolt();
+      thunderSound();
+    }
+    if (lightning > 0) {
+      lightning -= dt;
+      const flash = Math.max(0, lightning) * 4;
+      keyLight.intensity = WEATHER.storm.key + flash;
+      hemiLight.intensity = WEATHER.storm.hemi + flash * 0.7;
+      boltGroup.visible = lightning > 0.04;
+    }
+    if (lightning <= 0) boltGroup.visible = false;
+  }
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+<script>
+// ---- Crew: bots walk hub to hub, fill a progress bar at each task, and announce when they start work ----
+const WALK_SPEED = 0.7;          // world units per second - a slow walk you can follow
+const DONE_PAUSE = 2.5;          // seconds a finished bot shows "Done"
+const HANDOVER_PAUSE = 2.5;      // seconds between one task finishing and the next starting
+const TASK_STRETCH = 1.8;        // makes each task take longer than its listed seconds
+const MAX_NOTIFICATIONS = 40;
+const DESKTOP_ALERT_GAP = 8000;  // ms between desktop notifications
+const UI_REFRESH = 0.25;         // seconds between text updates
+const SPEEDS = [0.5, 1, 1.5];
+const TAG_MODES = ['active', 'all', 'off'];
+const JEZERO_EAST_LONGITUDE = 77.45;
+const KIND_LABEL = { agent: 'Subagent', plugin: 'Claude app plugin', extension: 'Claude Desktop extension' };
+
+const state = { running: false, speedIndex: 1, tagMode: 'active', selected: null, follow: false, zoomIn: false, desktopAlerts: false, lastDesktopAlert: 0, topic: '' };
+const $ = id => document.getElementById(id);
+const hex = n => '#' + n.toString(16).padStart(6, '0');
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = text;
+  return node;
+}
+
+const BOT_GEO = {
+  body: new THREE.SphereGeometry(0.34, 18, 14),
+  head: new THREE.SphereGeometry(0.27, 18, 14),
+  band: new THREE.TorusGeometry(0.33, 0.045, 8, 28),
+  stem: new THREE.CylinderGeometry(0.018, 0.018, 0.28, 6),
+  bead: new THREE.SphereGeometry(0.06, 10, 8),
+  hover: new THREE.TorusGeometry(0.22, 0.035, 6, 24),
+};
+const SHELL = new THREE.MeshStandardMaterial({ color: 0xF3ECE3, roughness: 0.45 });
+const VISOR = new THREE.MeshStandardMaterial({ color: 0x1B1413, roughness: 0.15, metalness: 0.7 });
+
+// Faceless bot: ceramic egg body, glossy visor head, antenna bead and hover ring in its hub colour.
+function makeBotMesh(color) {
+  const root = new THREE.Group(), inner = new THREE.Group();
+  root.scale.setScalar(1.28);
+  root.add(inner);
+  const glow = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.4 });
+  const legs = [], arms = [];
+  const add = (geo, mat, x, y, z) => {
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    inner.add(mesh);
+    return mesh;
+  };
+  add(BOT_GEO.body, SHELL, 0, 0.58, 0).scale.set(1, 1.12, 1);
+  add(BOT_GEO.head, VISOR, 0, 1.04, 0.02).scale.set(1.05, 0.9, 1);
+  add(BOT_GEO.band, glow, 0, 0.62, 0).rotation.x = Math.PI / 2;
+  add(BOT_GEO.stem, SHELL, 0, 1.36, 0);
+  add(BOT_GEO.bead, glow, 0, 1.52, 0);
+  add(BOT_GEO.bead, SHELL, -0.37, 0.58, 0).scale.setScalar(1.3);
+  add(BOT_GEO.bead, SHELL, 0.37, 0.58, 0).scale.setScalar(1.3);
+  for (const side of [-1, 1]) {
+    const leg = add(new THREE.CylinderGeometry(0.055, 0.07, 0.34, 6), SHELL, side * 0.13, 0.25, 0);
+    legs.push(leg);
+    const arm = add(new THREE.CylinderGeometry(0.045, 0.06, 0.32, 6), SHELL, side * 0.4, 0.72, 0);
+    arm.rotation.z = side * 0.42;
+    arms.push(arm);
+    add(BOT_GEO.bead, SHELL, side * 0.49, 0.58, 0);
+  }
+  return { root, inner, glow, legs, arms };
+}
+
+// Straight-line walk, detouring around Ops Core when the line would cut through it.
+function routeTo(from, to) {
+  const d = new THREE.Vector3().subVectors(to, from);
+  const lenSq = d.lengthSq();
+  if (lenSq < 1e-6) return [];
+  const t = THREE.MathUtils.clamp(-from.dot(d) / lenSq, 0, 1);
+  const closest = from.clone().addScaledVector(d, t);
+  const clearance = HUB_BY_ID.core.radius + 1.2;
+  if (t > 0 && t < 1 && closest.length() < clearance) {
+    if (closest.length() < 0.01) closest.set(-d.z, 0, d.x);
+    return [closest.setLength(clearance + 0.6), to.clone()];
+  }
+  return [to.clone()];
+}
+
+// Work spot on the side of the hub facing where the bot comes from, fanned out per bot.
+function slotFor(botIndex, hub, from) {
+  const base = Math.atan2(from.z - hub.pos.z, from.x - hub.pos.x);
+  const spread = (((botIndex * 0.618) % 1) - 0.5) * 1.8;
+  const r = hub.radius + 0.9;
+  return new THREE.Vector3(hub.pos.x + Math.cos(base + spread) * r, 0, hub.pos.z + Math.sin(base + spread) * r);
+}
+
+const currentTask = bot => {
+  const [label, hubId, seconds] = bot.def.tasks[bot.taskIndex];
+  return { label, hub: HUB_BY_ID[hubId], seconds };
+};
+const pathLength = (from, path) => path.reduce((sum, p, i) => sum + p.distanceTo(i ? path[i - 1] : from), 0);
+
+// Opens idle: nothing runs until you press Run pipeline or Step, the same as the real skills.
+const bots = BOTS.map((def, index) => {
+  const hub = HUB_BY_ID[def.tasks[0][1]];
+  const color = HUB_BY_ID[def.home].color;
+  const mesh = makeBotMesh(color);
+  const pos = new THREE.Vector3(0, 0, 0);
+  const bot = { def, index, color, mesh, hub: HUB_BY_ID.core, pos, taskIndex: 0, state: 'idle', progress: 0, ran: false, path: [], walked: 0, walkTotal: 1, walkPurpose: 'work', doneTimer: 0, facing: 0 };
+  mesh.root.userData.bot = bot;
+  mesh.root.position.copy(pos);
+  mesh.root.rotation.y = Math.atan2(hub.pos.x - pos.x, hub.pos.z - pos.z);
+  scene.add(mesh.root);
+  return bot;
+});
+
+// Exactly one bot works at a time, the way the real skills run: one step, then the next.
+let activeBot = null, handover = 0, lastIndex = -1;
+
+function clearActive() {
+  if (!activeBot) return;
+  activeBot.state = 'idle';
+  activeBot.progress = 0;
+  activeBot.path = [];
+  activeBot = null;
+}
+
+function startBot(bot) {
+  clearActive();
+  if (bot.ran) bot.taskIndex = (bot.taskIndex + 1) % bot.def.tasks.length;
+  bot.ran = true;
+  activeBot = bot;
+  lastIndex = bot.index;
+  const task = currentTask(bot);
+  if (task.hub === bot.hub && bot.pos.length() < 0.5) {
+    bot.walkPurpose = 'work';
+    bot.state = 'work';
+    bot.progress = 0;
+  } else {
+    bot.path = routeTo(bot.pos, slotFor(bot.index, task.hub, bot.pos));
+    bot.walkTotal = pathLength(bot.pos, bot.path);
+    bot.walked = 0;
+    bot.hub = task.hub;
+    bot.walkPurpose = 'work';
+    bot.state = 'walk';
+  }
+  notifyDesktop(bot);
+  logEvent(bot, `started ${currentTask(bot).label}`);
+  blip(520);
+  refreshText();
+}
+
+function runNext() {
+  handover = 0;
+  startBot(bots[(lastIndex + 1) % bots.length]);
+}
+
+function stepSim(dt) {
+  if (handover > 0) {
+    handover -= dt;
+    if (handover <= 0 && state.running) runNext();
+    return;
+  }
+  const bot = activeBot;
+  if (!bot) {
+    if (state.running) runNext();
+    return;
+  }
+  if (bot.state === 'walk') {
+    let budget = WALK_SPEED * dt;
+    while (budget > 0 && bot.path.length) {
+      const target = bot.path[0];
+      const gap = bot.pos.distanceTo(target);
+      if (gap <= budget) {
+        bot.pos.copy(target);
+        bot.path.shift();
+        budget -= gap;
+        bot.walked += gap;
+      } else {
+        const dir = target.clone().sub(bot.pos).normalize();
+        bot.facing = Math.atan2(dir.x, dir.z);
+        bot.pos.addScaledVector(dir, budget);
+        bot.walked += budget;
+        budget = 0;
+      }
+    }
+    if (!bot.path.length) {
+      if (bot.walkPurpose === 'center') {
+        bot.state = 'done';
+        bot.doneTimer = DONE_PAUSE;
+      } else {
+        bot.state = 'work';
+        bot.progress = 0;
+      }
+    }
+  } else if (bot.state === 'work') {
+    const task = currentTask(bot);
+    bot.facing = Math.atan2(task.hub.pos.x - bot.pos.x, task.hub.pos.z - bot.pos.z);
+    bot.progress = Math.min(1, bot.progress + dt / (task.seconds * TASK_STRETCH));
+    if (bot.progress >= 1) {
+      bot.path = routeTo(bot.pos, new THREE.Vector3(0, 0, 0));
+      bot.walkTotal = pathLength(bot.pos, bot.path);
+      bot.walked = 0;
+      bot.walkPurpose = 'center';
+      bot.state = 'walk';
+    }
+  } else if (bot.state === 'done') {
+    bot.doneTimer -= dt;
+    if (bot.doneTimer <= 0) {
+      bot.state = 'idle';
+      activeBot = null;
+      handover = state.running ? HANDOVER_PAUSE : 0;
+      refreshText();
+    }
+  }
+}
+
+function poseBot(bot, frameDt, simTime) {
+  const { root, inner, glow } = bot.mesh;
+  root.position.copy(bot.pos);
+  const turn = Math.atan2(Math.sin(bot.facing - root.rotation.y), Math.cos(bot.facing - root.rotation.y));
+  root.rotation.y += turn * Math.min(1, REDUCED_MOTION ? 1 : frameDt * 8);
+  if (!REDUCED_MOTION) {
+    const walking = bot.state === 'walk' || bot.state === 'idle';
+    const stride = walking ? Math.sin(simTime * 5.5 + bot.index) * 0.34 : 0;
+    bot.mesh.legs[0].rotation.z = stride;
+    bot.mesh.legs[1].rotation.z = -stride;
+    bot.mesh.arms[0].rotation.z = -0.42 - stride * 0.7;
+    bot.mesh.arms[1].rotation.z = 0.42 + stride * 0.7;
+    inner.position.y = 0.08 + Math.sin(simTime * (walking ? 4 : 1.1) + bot.index) * (walking ? 0.04 : 0.022);
+    inner.rotation.z = bot.state === 'work' ? Math.sin(simTime * 2.4 + bot.index) * 0.05 : 0;
+  }
+  glow.emissiveIntensity = bot.state === 'done' ? 2 : bot.state === 'work' ? 1 + Math.sin(simTime * 2 + bot.index) * 0.3 : 0.22;
+}
+
+// ---- Overlays: hub labels and the task panel over every bot ----
+const tagLayer = $('tags');
+tagLayer.setAttribute('aria-hidden', 'true'); // the crew roster is the accessible version of these panels
+for (const bot of bots) {
+  const root = el('button', 'tag');
+  root.type = 'button';
+  root.tabIndex = -1;
+  root.style.setProperty('--c', hex(bot.color));
+  const task = el('span', 'task'), bar = el('span', 'bar'), fill = el('i'), meta = el('span', 'meta'), where = el('span'), pct = el('span');
+  bar.append(fill);
+  meta.append(where, pct);
+  root.append(el('span', 'who', bot.def.name), task, bar, meta);
+  root.addEventListener('click', () => select(bot, false));
+  tagLayer.append(root);
+  bot.tag = { root, task, fill, where, pct, text: '' };
+}
+for (const hub of HUBS) {
+  const label = el('div', 'hub-label');
+  label.style.setProperty('--c', hex(hub.color));
+  label.append(el('b', null, hub.name), el('span', null, hub.role));
+  $('labels').append(label);
+  hub.label = label;
+}
+
+const projected = new THREE.Vector3();
+function pinToScreen(node, worldPos, lift, minScale) {
+  projected.set(worldPos.x, worldPos.y + lift, worldPos.z);
+  const distance = camera.position.distanceTo(projected);
+  projected.project(camera);
+  const offscreen = projected.z > 1 || Math.abs(projected.x) > 1.15 || Math.abs(projected.y) > 1.15;
+  node.style.visibility = offscreen ? 'hidden' : '';
+  if (offscreen) return;
+  const x = (projected.x * 0.5 + 0.5) * innerWidth, y = (-projected.y * 0.5 + 0.5) * innerHeight;
+  const scale = THREE.MathUtils.clamp(22 / distance, minScale, 1);
+  node.style.transform = `translate(${x}px, ${y}px) scale(${scale}) translate(-50%, -100%)`;
+  node.style.zIndex = String(10000 - Math.round(distance * 10));
+}
+
+function placeOverlays() {
+  for (const bot of bots) {
+    const show = bot === state.selected || bot === activeBot || state.tagMode === 'all';
+    if (!show) {
+      bot.tag.root.style.visibility = 'hidden';
+      continue;
+    }
+    pinToScreen(bot.tag.root, bot.pos, 1.5, 0.55);
+    const progress = bot.state === 'walk' ? Math.min(1, bot.walked / Math.max(bot.walkTotal, 0.001)) : bot.progress;
+    bot.tag.fill.style.transform = `scaleX(${progress})`;
+  }
+  for (const hub of HUBS) pinToScreen(hub.label, hub.pos, hub.top + 1.8, 0.7);
+}
+
+// ---- Crew roster ----
+for (const hub of HUBS) {
+  const crew = bots.filter(b => b.def.home === hub.id);
+  if (!crew.length) continue;
+  const group = el('section', 'group');
+  group.style.setProperty('--c', hex(hub.color));
+  const heading = el('h3');
+  heading.append(el('span', 'hx'), el('span', null, hub.name), el('small', null, hub.role));
+  const list = el('div');
+  list.setAttribute('role', 'list');
+  for (const bot of crew) {
+    const row = el('button', 'row');
+    row.type = 'button';
+    row.setAttribute('role', 'listitem');
+    row.style.setProperty('--c', hex(bot.color));
+    const status = el('span'), bar = el('span', 'bar'), fill = el('i'), st = el('span', 'st');
+    bar.append(fill);
+    st.append(status, bar);
+    row.append(el('span', 'nm', bot.def.name), el('span', 'id', bot.def.kind ? `${bot.def.kind} · ${bot.def.id}` : bot.def.id), st);
+    row.addEventListener('click', () => select(bot, true));
+    list.append(row);
+    bot.row = { root: row, status, fill };
+  }
+  group.append(heading, list);
+  $('roster').append(group);
+}
+$('crewCount').textContent = bots.length;
+
+function refreshText() {
+  for (const bot of bots) {
+    const task = currentTask(bot);
+    const live = bot === activeBot;
+    const pct = live && bot.state !== 'walk' ? `${Math.round(bot.progress * 100)}%` : '';
+    const label = !live ? 'Idle'
+      : bot.state === 'walk' ? `Walking to ${task.hub.name}`
+      : bot.state === 'done' ? `Done · ${task.label}`
+      : task.label;
+    const text = `${live ? bot.state : 'idle'}|${label}|${pct}`;
+    if (text !== bot.tag.text) {
+      bot.tag.text = text;
+      bot.tag.root.dataset.state = live ? bot.state : 'idle';
+      bot.tag.task.textContent = label;
+      bot.tag.where.textContent = live ? task.hub.name : bot.def.id;
+      bot.tag.pct.textContent = pct;
+      bot.row.root.dataset.state = live ? bot.state : 'idle';
+      bot.row.status.textContent = !live ? 'Idle'
+        : bot.state === 'walk' ? 'Walking'
+        : bot.state === 'done' ? 'Done'
+        : `Working ${pct}`;
+    }
+    bot.row.fill.style.transform = `scaleX(${live && bot.state !== 'walk' ? bot.progress : 0})`;
+  }
+  $('activeCount').textContent = activeBot ? 1 : 0;
+  updateStatusStrip();
+  if (state.selected) renderStatus(state.selected);
+}
+
+// One line of truth: who is working, on what, and how far along. Nothing else claims to be running.
+function updateStatusStrip() {
+  const dot = $('ssDot'), text = $('ssText'), fill = $('ssFill');
+  if (!activeBot) {
+    dot.style.setProperty('--c', 'var(--dust)');
+    text.textContent = state.running ? 'Handing over to the next skill…' : 'Idle - nothing is running. Press Run pipeline, or Step for one task.';
+    fill.style.transform = 'scaleX(0)';
+    return;
+  }
+  const task = currentTask(activeBot);
+  dot.style.setProperty('--c', hex(activeBot.color));
+  text.textContent = activeBot.state === 'walk'
+    ? `${activeBot.def.name} is walking to ${task.hub.name}`
+    : activeBot.state === 'done'
+      ? `${activeBot.def.name} finished ${task.label}`
+      : `${activeBot.def.name} · ${task.label} · ${task.hub.name}`;
+  fill.style.transform = `scaleX(${activeBot.state === 'walk' ? 0 : activeBot.progress})`;
+}
+
+// ---- Detail card ----
+function markSelected(bot, on) {
+  for (const node of [bot.tag.root, bot.row.root]) {
+    if (on) node.setAttribute('aria-current', 'true');
+    else node.removeAttribute('aria-current');
+  }
+}
+
+function select(bot, follow) {
+  if (state.selected) markSelected(state.selected, false);
+  state.selected = bot;
+  state.follow = state.zoomIn = follow;
+  markSelected(bot, true);
+  const home = HUB_BY_ID[bot.def.home];
+  $('detail').style.setProperty('--c', hex(bot.color));
+  $('dHub').textContent = `${home.name} · ${home.role}`;
+  $('dName').textContent = bot.def.name;
+  $('dId').textContent = `${KIND_LABEL[bot.def.kind] || 'Skill'} · ${bot.def.id}`;
+  $('dWhat').textContent = bot.def.what;
+  $('dCmd').textContent = bot.def.cmd;
+  $('dSetup').textContent = bot.def.setup ? `Setup: ${bot.def.setup}` : 'No extra setup listed.';
+  $('copy').textContent = 'Copy';
+  syncFollowButton();
+  renderStatus(bot);
+  $('detail').hidden = false;
+  if (innerWidth <= 760) setCrewOpen(false);
+}
+
+function renderStatus(bot) {
+  const task = currentTask(bot);
+  const topic = state.topic || 'your next video';
+  $('dStatus').textContent = bot.state === 'walk'
+    ? `Heading to ${task.hub.name} to “${task.label}”`
+    : bot.state === 'done'
+      ? `Finished “${task.label}” for “${topic}”`
+      : `${Math.round(bot.progress * 100)}% · “${task.label}” for “${topic}”`;
+}
+
+function closeDetail() {
+  if (state.selected) markSelected(state.selected, false);
+  state.selected = null;
+  state.follow = state.zoomIn = false;
+  $('detail').hidden = true;
+}
+
+function syncFollowButton() {
+  $('follow').setAttribute('aria-pressed', String(state.follow));
+  $('follow').textContent = state.follow ? 'Following' : 'Follow bot';
+}
+
+const followGoal = new THREE.Vector3();
+function updateFollow(frameDt) {
+  if (!state.follow || !state.selected) return;
+  const step = REDUCED_MOTION ? 1 : Math.min(1, frameDt * 3);
+  const delta = followGoal.copy(state.selected.pos).setY(0.8).sub(controls.target).multiplyScalar(step);
+  controls.target.add(delta);
+  camera.position.add(delta);
+  if (state.zoomIn) {
+    if (camera.position.distanceTo(controls.target) > 20) camera.position.lerp(controls.target, step * 0.25);
+    else state.zoomIn = false;
+  }
+}
+
+// ---- Notifications ----
+// Nothing pops up on its own any more. Events go to the notifications panel; the button counts unread ones.
+const notifications = [];
+let unread = 0;
+
+function toast({ color, title, body, bot }) {
+  notifications.unshift({ color, title, body, bot, time: new Date() });
+  if (notifications.length > MAX_NOTIFICATIONS) notifications.pop();
+  unread++;
+  syncNotifButton();
+  if (!$('notif').hidden) renderNotifications();
+}
+
+function logEvent(bot, what) {
+  toast({ color: bot ? bot.color : 0x86C9DC, title: bot ? bot.def.name : 'Base', body: what, bot });
+}
+
+function syncNotifButton() {
+  $('notifBtn').textContent = unread ? `Notifications ${unread}` : 'Notifications';
+  $('notifBtn').setAttribute('aria-pressed', String(unread > 0));
+}
+
+function renderNotifications() {
+  const list = $('notifList');
+  list.textContent = '';
+  if (!notifications.length) {
+    list.append(el('p', 'empty', 'Nothing yet.'));
+    return;
+  }
+  for (const entry of notifications) {
+    const row = el('li');
+    row.style.setProperty('--c', hex(entry.color));
+    row.append(el('span', 'hx'), el('span', null, `${entry.title} · ${entry.body}`), el('time', null, entry.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
+    if (entry.bot) {
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => select(entry.bot, false));
+    }
+    list.append(row);
+  }
+}
+
+$('notifBtn').addEventListener('click', () => {
+  const panel = $('notif');
+  panel.hidden = !panel.hidden;
+  $('notifBtn').setAttribute('aria-expanded', String(!panel.hidden));
+  if (panel.hidden) return;
+  unread = 0;
+  syncNotifButton();
+  renderNotifications();
+});
+
+// No pop-up per task - the status strip carries that. Desktop alerts fire only when the tab is hidden.
+function notifyDesktop(bot) {
+  if (!state.desktopAlerts || !document.hidden || Date.now() - state.lastDesktopAlert < DESKTOP_ALERT_GAP) return;
+  const task = currentTask(bot);
+  try {
+    new Notification(`${bot.def.name} started`, { body: `${task.label} · ${task.hub.name}`, tag: 'jezero-crew' });
+    state.lastDesktopAlert = Date.now();
+  } catch (err) {
+    state.desktopAlerts = false;
+    syncAlertsButton();
+  }
+}
+
+function syncAlertsButton() {
+  $('alerts').setAttribute('aria-pressed', String(state.desktopAlerts));
+  $('alerts').textContent = state.desktopAlerts ? 'Desktop alerts on' : 'Desktop alerts';
+}
+
+function alertsBlocked() {
+  toast({ color: 0xF1CF63, lead: 'Alerts', title: 'Desktop alerts are blocked here', body: 'Allow notifications for this page in your browser settings. In-scene alerts stay on.', lifetime: 8000 });
+}
+
+$('alerts').addEventListener('click', async () => {
+  if (state.desktopAlerts) {
+    state.desktopAlerts = false;
+    return syncAlertsButton();
+  }
+  if (!('Notification' in window)) return alertsBlocked();
+  try {
+    const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    state.desktopAlerts = permission === 'granted';
+    syncAlertsButton();
+    if (!state.desktopAlerts) return alertsBlocked();
+    toast({ color: 0x7EE0B5, lead: 'Alerts', title: 'Desktop alerts on', body: 'You’ll get one when a bot starts work while this tab is in the background.' });
+  } catch (err) {
+    alertsBlocked();
+  }
+});
+
+// ---- Controls ----
+function syncRunButton() {
+  $('play').textContent = state.running ? 'Pause' : 'Run pipeline';
+  $('play').setAttribute('aria-pressed', String(state.running));
+}
+$('play').addEventListener('click', () => {
+  state.running = !state.running;
+  syncRunButton();
+  if (state.running && !activeBot && handover <= 0) runNext();
+  else refreshText();
+});
+$('step').addEventListener('click', () => {
+  state.running = false;
+  syncRunButton();
+  runNext();
+});
+$('speed').addEventListener('click', () => {
+  state.speedIndex = (state.speedIndex + 1) % SPEEDS.length;
+  $('speed').textContent = `Speed ${SPEEDS[state.speedIndex]}×`;
+});
+$('tagMode').addEventListener('click', () => {
+  state.tagMode = TAG_MODES[(TAG_MODES.indexOf(state.tagMode) + 1) % TAG_MODES.length];
+  $('tagMode').textContent = `Tags: ${state.tagMode}`;
+});
+
+function setCrewOpen(open) {
+  $('crew').hidden = !open;
+  $('crewBtn').setAttribute('aria-expanded', String(open));
+  $('crewTab').setAttribute('aria-expanded', String(open));
+  $('crewTab').hidden = open;
+  document.body.classList.toggle('crew-closed', !open);
+}
+for (const id of ['crewBtn', 'crewTab']) $(id).addEventListener('click', () => setCrewOpen($('crew').hidden));
+$('crewClose').addEventListener('click', () => setCrewOpen(false));
+setCrewOpen(false);
+
+const topicInput = $('topic');
+function syncTopic() {
+  state.topic = topicInput.value.trim();
+  if (state.selected) renderStatus(state.selected);
+}
+topicInput.addEventListener('input', syncTopic);
+syncTopic();
+
+$('dClose').addEventListener('click', closeDetail);
+$('follow').addEventListener('click', () => {
+  state.follow = !state.follow;
+  state.zoomIn = state.follow;
+  syncFollowButton();
+});
+$('copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('dCmd').textContent);
+    $('copy').textContent = 'Copied';
+  } catch (err) {
+    const range = document.createRange();
+    range.selectNodeContents($('dCmd'));
+    getSelection().removeAllRanges();
+    getSelection().addRange(range);
+    $('copy').textContent = 'Press ⌘/Ctrl+C';
+  }
+});
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && state.selected) closeDetail();
+});
+
+const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
+let pointerDown = null;
+renderer.domElement.addEventListener('pointerdown', e => { pointerDown = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!pointerDown || Math.hypot(e.clientX - pointerDown.x, e.clientY - pointerDown.y) > 5) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  let node = raycaster.intersectObjects(bots.map(b => b.mesh.root), true)[0]?.object;
+  while (node && !node.userData.bot) node = node.parent;
+  if (node) select(node.userData.bot, false);
+});
+
+// Mars Sol Date and Local Mean Solar Time at Jezero Crater, using the Mars24 algorithm.
+function updateMarsClock() {
+  const jdTT = Date.now() / 86400000 + 2440587.5 + 69.184 / 86400;
+  const msd = (jdTT - 2405522.0028779) / 1.0274912517;
+  const lmst = (((msd % 1) + 1) % 1 * 24 + JEZERO_EAST_LONGITUDE / 15) % 24;
+  const pad = n => String(Math.floor(n)).padStart(2, '0');
+  $('msd').textContent = `MSD ${Math.floor(msd).toLocaleString('en-US')}`;
+  $('lmst').textContent = `LMST ${pad(lmst)}:${pad((lmst % 1) * 60)}:${pad((lmst * 3600) % 60)}`;
+}
+
+// ponytail: one runnable check for the routing logic. Open the page with #selftest and watch the console.
+if (location.hash === '#selftest') {
+  const across = routeTo(new THREE.Vector3(-10, 0, 0), new THREE.Vector3(10, 0, 0));
+  console.assert(across.length === 2 && across[0].length() > HUB_BY_ID.core.radius, 'route through Ops Core should detour', across);
+  console.assert(routeTo(new THREE.Vector3(-10, 0, 8), new THREE.Vector3(10, 0, 8)).length === 1, 'route clear of Ops Core should be direct');
+  console.assert(routeTo(new THREE.Vector3(1, 0, 1), new THREE.Vector3(1, 0, 1)).length === 0, 'zero-length route should be empty');
+}
+
+// ---- Main loop. Hidden tabs keep simulating on a slow timer so desktop alerts still fire. ----
+const clock = new THREE.Clock();
+let elapsed = 0, simTime = 0, uiTimer = 0, backgroundTimer = 0;
+
+function frame() {
+  const frameDt = Math.min(clock.getDelta(), 0.1);
+  const dt = frameDt * SPEEDS[state.speedIndex];
+  elapsed += frameDt;
+  simTime += dt;
+  stepSim(dt);
+  for (const bot of bots) {
+    if (bot.state !== 'idle') continue;
+    const angle = simTime * 0.035 + bot.index * 2.39996;
+    const radius = 5.2 + (bot.index % 4) * 0.55;
+    bot.pos.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+    bot.facing = angle + Math.PI / 2;
+  }
+  for (const bot of bots) poseBot(bot, frameDt, simTime);
+  animateScene(elapsed, frameDt);
+  updateFollow(frameDt);
+  controls.update();
+  renderer.render(scene, camera);
+  placeOverlays();
+  if ((uiTimer += frameDt) >= UI_REFRESH) {
+    uiTimer = 0;
+    refreshText();
+    updateMarsClock();
+  }
+  requestAnimationFrame(frame);
+}
+
+document.addEventListener('visibilitychange', () => {
+  clearInterval(backgroundTimer);
+  if (!document.hidden) {
+    clock.getDelta();
+    return;
+  }
+  let last = performance.now();
+  backgroundTimer = setInterval(() => {
+    const now = performance.now();
+    const real = Math.min((now - last) / 1000, 5);
+    last = now;
+    stepSim(real * SPEEDS[state.speedIndex]);
+  }, 1000);
+});
+
+// ---- Live status: reads status.js written next to this page by the Claude Code hook ----
+const LIVE_POLL_MS = 5000;
+
+function applyLive(status) {
+  if (!status || !status.skill) return;
+  const bot = bots.find(b => b.def.id === status.skill || b.def.id.endsWith(status.skill));
+  if (!bot) return;
+  if (status.at === bot.lastLiveAt) return;
+  bot.lastLiveAt = status.at;
+  if (status.state === 'end') {
+    if (activeBot === bot) {
+      bot.progress = 1;
+      bot.state = 'done';
+      bot.doneTimer = DONE_PAUSE;
+    }
+    logEvent(bot, `finished ${status.task || 'a task'} (live)`);
+  } else if (activeBot !== bot) {
+    state.running = false;
+    syncRunButton();
+    startBot(bot);
+    logEvent(bot, `running for real: ${status.task || status.skill}`);
+  }
+  refreshText();
+}
+
+function pollLive() {
+  const previous = $('liveStatus');
+  if (previous) previous.remove();
+  const script = document.createElement('script');
+  script.id = 'liveStatus';
+  script.src = `status.js?t=${Date.now()}`;
+  script.onload = () => applyLive(window.JEZERO_STATUS);
+  script.onerror = () => {};
+  document.body.append(script);
+}
+
+if (location.protocol === 'file:') {
+  pollLive();
+  setInterval(pollLive, LIVE_POLL_MS);
+}
+
+refreshText();
+updateMarsClock();
+syncNotifButton();
+logEvent(null, `${bots.length} skills loaded, none running. Press Run pipeline or Step.`);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
